@@ -30,6 +30,10 @@
 - [x] Connect the Android repository to authenticated mobile backend contracts and synchronize chat, tasks, projects, memory, files, settings, activity, and tool data.
 - [x] Wire Room into the active Android repository and implement a safe WorkManager queue for offline-capable refresh and retry foundations.
 - [x] Add Android unit/UI coverage for mobile navigation and secure configuration behavior, then rerun the GitHub Android validation workflow.
-- [ ] Connect Android chat streaming and the Files, Memory, Tools, Settings, and Activity surfaces to authenticated mobile backend flows.
-- [ ] Extend Room and WorkManager synchronization to cache and surface projects, memories, activity, and queued safe mobile actions.
-- [ ] Add Android instrumentation coverage for encrypted SecureConfig endpoint, session-cookie, and durable device-ID behavior, then rerun CI.
+- [x] Connect Android chat streaming and the Files, Memory, Tools, Settings, and Activity surfaces to authenticated mobile backend flows.
+- [x] Extend Room and WorkManager synchronization to cache and surface projects, memories, activity, and queued safe mobile actions.
+- [x] Add Android instrumentation coverage for encrypted SecureConfig endpoint, session-cookie, and durable device-ID behavior, then rerun CI.
+- [ ] Add dedicated Android Files, Tools, Settings, and Activity screens driven by authenticated mobile bootstrap data.
+- [ ] Render Android SSE response deltas progressively in the chat interface rather than only after stream completion.
+- [ ] Surface cached projects and implement a durable, user-approved queued mobile action model with WorkManager.
+- [ ] Extend Android SecureConfig tests to assert unsafe endpoint and invalid session-cookie rejection, then rerun GitHub Actions.

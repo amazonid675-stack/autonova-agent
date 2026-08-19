@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -54,7 +55,7 @@ private val Cloud = Color(0xFFF2F0FF)
             when (section) {
                 "Command" -> CommandScreen(viewModel, Modifier.padding(padding))
                 "Tasks" -> TasksScreen(viewModel, Modifier.padding(padding))
-                "Projects" -> DetailScreen("Projects", "Workspaces preserve conversations, files, tools, and durable project context.", Modifier.padding(padding))
+                "Projects" -> ProjectsScreen(viewModel, Modifier.padding(padding))
                 "Memory" -> MemoryScreen(viewModel, Modifier.padding(padding))
                 else -> MoreScreen(viewModel, Modifier.padding(padding))
             }
@@ -111,10 +112,13 @@ private val Cloud = Color(0xFFF2F0FF)
     val files by viewModel.files.collectAsState()
     val tools by viewModel.tools.collectAsState()
     val provider by viewModel.provider.collectAsState()
+    var selected by remember { mutableStateOf<String?>(null) }
     val surfaces = listOf("Files" to "Explicit attachment and document context.", "Tools" to "Permissioned capabilities with Ask, Allow, and Deny.", "GitHub" to "Read-only public context; writes require approval.", "Settings" to "Encrypted mobile configuration and provider session.", "Activity" to "Visible action summaries without hidden reasoning.")
-    Column(modifier.fillMaxSize().padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) { Text("More", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold); surfaces.forEach { (title, detail) -> Card(colors = CardDefaults.cardColors(containerColor = Panel)) { Column(Modifier.padding(16.dp)) { Text(title, fontWeight = FontWeight.SemiBold); Text(detail, color = Color.LightGray, style = MaterialTheme.typography.bodySmall) } } }; if (provider != null) Text("Provider: ${provider?.name} · ${provider?.costMode}", color = Lavender, style = MaterialTheme.typography.bodySmall); if (files.isNotEmpty()) Text("${files.size} synchronized files", color = Cloud, style = MaterialTheme.typography.bodySmall); if (tools.isNotEmpty()) Text("${tools.size} managed tool policies", color = Cloud, style = MaterialTheme.typography.bodySmall); if (activity.isNotEmpty()) { Text("Recent activity", color = Lavender, style = MaterialTheme.typography.labelSmall); activity.take(3).forEach { item -> Text(item.title, color = Cloud, style = MaterialTheme.typography.bodySmall) } } }
+    Column(modifier.fillMaxSize().padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) { Text(selected ?: "More", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold); if (selected == null) surfaces.forEach { (title, detail) -> Card(colors = CardDefaults.cardColors(containerColor = Panel), modifier = Modifier.fillMaxWidth().clickable { selected = title }) { Column(Modifier.padding(16.dp)) { Text(title, fontWeight = FontWeight.SemiBold); Text(detail, color = Color.LightGray, style = MaterialTheme.typography.bodySmall) } } } else when (selected) { "Files" -> files.forEach { file -> Text("${file.name} · ${file.mimeType}", color = Cloud) }; "Tools" -> tools.forEach { tool -> Text("${tool.key}: ${tool.policy}", color = Cloud) }; "Settings" -> Text(provider?.let { "${it.name} · ${it.costMode} · model ${it.model ?: "automatic"}" } ?: "No synchronized provider profile.", color = Cloud); "Activity" -> activity.forEach { item -> Text(item.title, color = Cloud) }; else -> Text("GitHub write actions remain confirmation-gated.", color = Cloud) }; if (selected != null) Text("Back", color = Lavender, modifier = Modifier.clickable { selected = null }) }
 }
 
 @Composable private fun DetailScreen(title: String, description: String, modifier: Modifier) { Column(modifier.fillMaxSize().padding(20.dp)) { Text(title, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold); Spacer(Modifier.height(12.dp)); Text(description, color = Color.LightGray) } }
 
 @Composable private fun MemoryScreen(viewModel: AutonovaViewModel, modifier: Modifier) { val memories by viewModel.memories.collectAsState(); Column(modifier.fillMaxSize().padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) { Text("Memory", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold); Text("Review, edit, or remove the information the agent may carry forward.", color = Color.LightGray); if (memories.isEmpty()) Text("No synchronized memories yet.", color = Color.LightGray) else LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) { items(memories) { memory -> Card(colors = CardDefaults.cardColors(containerColor = Panel)) { Column(Modifier.padding(14.dp)) { Text(memory.layer, color = Lavender, style = MaterialTheme.typography.labelSmall); Text(memory.title); Text(memory.content, color = Color.LightGray, style = MaterialTheme.typography.bodySmall) } } } } } }
+
+@Composable private fun ProjectsScreen(viewModel: AutonovaViewModel, modifier: Modifier) { val projects by viewModel.projects.collectAsState(); Column(modifier.fillMaxSize().padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) { Text("Projects", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold); if (projects.isEmpty()) Text("No synchronized workspaces yet.", color = Color.LightGray) else LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) { items(projects) { project -> Card(colors = CardDefaults.cardColors(containerColor = Panel)) { Column(Modifier.padding(14.dp)) { Text(project.name, fontWeight = FontWeight.SemiBold); Text(project.description, color = Color.LightGray, style = MaterialTheme.typography.bodySmall) } } } } } }

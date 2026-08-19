@@ -6,6 +6,7 @@ import im.autonova.mobile.data.SecureConfig
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.fail
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -22,5 +23,7 @@ class SecureConfigInstrumentedTest {
         assertEquals("https://agent.example.com", config.apiBaseUrl())
         assertEquals("session=mobile-test-value", config.sessionCookie())
         assertNotEquals("", config.deviceId())
+        try { config.saveApiBaseUrl("http://localhost:3000"); fail("Unsafe endpoint should be rejected") } catch (_: IllegalArgumentException) { }
+        try { config.saveSessionCookie("access-token") ; fail("Invalid cookie should be rejected") } catch (_: IllegalArgumentException) { }
     }
 }
