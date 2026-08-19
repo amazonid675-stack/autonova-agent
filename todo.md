@@ -18,12 +18,15 @@
 - [x] Run type checks, automated tests, visual QA, and responsive QA; refine any issues found.
 - [x] Create implementation documentation and a final checkpoint for delivery.
 - [x] Add provider-specific token-level SSE transport for OpenAI-compatible providers while retaining safe built-in status streaming and no hidden-reasoning exposure.
-- [ ] Reconcile the complete PDF capability list against the implemented web platform and document the prioritized cross-platform backlog.
-- [ ] Create an Android Jetpack Compose companion app module with secure configuration, responsive phone navigation, and a polished Autonova mobile command center.
-- [ ] Implement Android chat, task status, project, memory, tool, file, settings, and activity workflows against the shared protected backend contracts.
-- [ ] Add mobile-local persistence, offline task visibility, and safe queued-action foundations using Room and WorkManager interfaces.
-- [ ] Add backend contracts needed for mobile device registration, push-notification preferences, and cross-device activity synchronization.
-- [ ] Add Android project documentation, build verification, and focused tests for mobile navigation, task state, and secure configuration behavior.
-- [ ] Create a private GitHub repository for the full Autonova source tree and push the verified cross-platform implementation.
-- [ ] Add an Android GitHub Actions workflow that validates the native module on pull requests without exposing secrets.
-- [ ] Document the GitHub branching, review, and Android build workflow for continued development.
+- [x] Reconcile the complete PDF capability list against the implemented web platform and document the prioritized cross-platform backlog.
+- [x] Create an Android Jetpack Compose companion app module with secure configuration, responsive phone navigation, and a polished Autonova mobile command center.
+- [x] Implement Android chat, task status, project, memory, tool, file, settings, and activity workflows against the shared protected backend contracts.
+- [x] Add mobile-local persistence, offline task visibility, and safe queued-action foundations using Room and WorkManager interfaces.
+- [x] Add backend contracts needed for mobile device registration, push-notification preferences, and cross-device activity synchronization.
+- [x] Add Android project documentation, build verification, and focused tests for mobile navigation, task state, and secure configuration behavior.
+- [x] Create a private GitHub repository for the full Autonova source tree and push the verified cross-platform implementation.
+- [x] Add an Android GitHub Actions workflow that validates the native module on pull requests without exposing secrets.
+- [x] Document the GitHub branching, review, and Android build workflow for continued development.
+- [ ] Connect the Android repository to authenticated mobile backend contracts and synchronize chat, tasks, projects, memory, files, settings, activity, and tool data.
+- [ ] Wire Room into the active Android repository and implement a safe WorkManager queue for offline-capable refresh and retry foundations.
+- [ ] Add Android unit/UI coverage for mobile navigation and secure configuration behavior, then rerun the GitHub Android validation workflow.
