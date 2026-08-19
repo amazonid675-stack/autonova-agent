@@ -34,7 +34,7 @@
 - [x] Extend Room and WorkManager synchronization to cache and surface projects, memories, activity, and queued safe mobile actions.
 - [x] Add Android instrumentation coverage for encrypted SecureConfig endpoint, session-cookie, and durable device-ID behavior, then rerun CI.
 - [x] Add dedicated Android Files, Tools, Settings, and Activity detail sections driven by authenticated mobile bootstrap data.
-- [ ] Render Android SSE response deltas progressively in the chat interface rather than only after stream completion.
+- [x] Render Android SSE response deltas progressively in the chat interface rather than only after stream completion.
 - [x] Surface cached projects and implement a durable, user-approved queued mobile action foundation with WorkManager.
 - [x] Extend Android SecureConfig tests to assert unsafe endpoint and invalid session-cookie rejection, then rerun GitHub Actions.
 - [ ] Run Android instrumentation tests on an emulator in GitHub Actions so secure configuration rejection behavior is executed and verified.

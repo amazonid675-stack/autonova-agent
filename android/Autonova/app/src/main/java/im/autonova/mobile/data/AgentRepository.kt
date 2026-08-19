@@ -38,8 +38,20 @@ class AgentRepository(private val cache: AgentCacheDao, private val config: Secu
         val now = System.currentTimeMillis(); val user = ChatMessage("local-$now", "user", text, now); appendLocalMessage(user)
         val endpoint = config.apiBaseUrl(); val cookie = config.sessionCookie()
         if (endpoint != null && cookie != null) {
-            val reply = runCatching { MobileAgentApi(endpoint, cookie).sendMessage(text) }.getOrNull()
-            if (!reply.isNullOrBlank()) appendLocalMessage(ChatMessage("agent-${System.currentTimeMillis()}", "assistant", reply, System.currentTimeMillis()))
+            val assistantId = "agent-${System.currentTimeMillis()}"
+            val assistantCreatedAt = System.currentTimeMillis()
+            var receivedSnapshot = false
+            val reply = runCatching {
+                MobileAgentApi(endpoint, cookie).sendMessage(text) { snapshot ->
+                    if (snapshot.isNotBlank()) {
+                        receivedSnapshot = true
+                        cache.upsertMessage(CachedMessage(assistantId, "assistant", snapshot, assistantCreatedAt))
+                    }
+                }
+            }.getOrNull()
+            if (!receivedSnapshot && !reply.isNullOrBlank()) {
+                cache.upsertMessage(CachedMessage(assistantId, "assistant", reply, assistantCreatedAt))
+            }
         }
         if (text.lowercase().startsWith("build") || text.lowercase().startsWith("create")) createLocalTask(text)
     }
