@@ -7,6 +7,7 @@ import {
   InsertUser,
   memories,
   messages,
+  mobileDevices,
   projects,
   providerConfigs,
   taskSteps,
@@ -132,7 +133,7 @@ export async function createTask(userId: number, request: string, options: { pro
   return rows[0] ?? null;
 }
 
-export async function updateTask(userId: number, taskId: number, values: Partial<{ status: "QUEUED" | "PLANNING" | "RUNNING" | "WAITING_FOR_USER" | "VERIFYING" | "FAILED" | "COMPLETED" | "CANCELLED"; finalResult: string | null; errorSummary: string | null; completedAt: Date | null }>) {
+export async function updateTask(userId: number, taskId: number, values: Partial<{ status: "QUEUED" | "PLANNING" | "RUNNING" | "WAITING_FOR_USER" | "WAITING_FOR_TOOL" | "VERIFYING" | "FAILED" | "COMPLETED" | "CANCELLED"; finalResult: string | null; errorSummary: string | null; completedAt: Date | null; retryCount: number; nextRetryAt: Date | null }>) {
   const db = await getDb();
   if (!db) return;
   await db.update(agentTasks).set({ ...values, updatedAt: new Date() }).where(and(eq(agentTasks.id, taskId), eq(agentTasks.userId, userId)));
@@ -163,7 +164,7 @@ export async function listMemories(userId: number, projectId?: number) {
   return db.select().from(memories).where(condition).orderBy(desc(memories.updatedAt));
 }
 
-export async function createMemory(userId: number, input: { layer: "SHORT_TERM" | "TASK" | "PROJECT" | "PERSONAL"; title: string; content: string; projectId?: number; taskId?: number }) {
+export async function createMemory(userId: number, input: { layer: "SHORT_TERM" | "TASK" | "PROJECT" | "PERSONAL" | "DOCUMENT"; title: string; content: string; projectId?: number; taskId?: number }) {
   const db = await getDb();
   if (!db) return null;
   await db.insert(memories).values({ userId, ...input, projectId: input.projectId ?? null, taskId: input.taskId ?? null });
@@ -171,7 +172,7 @@ export async function createMemory(userId: number, input: { layer: "SHORT_TERM" 
   return rows[0] ?? null;
 }
 
-export async function updateMemory(userId: number, memoryId: number, values: { title?: string; content?: string; layer?: "SHORT_TERM" | "TASK" | "PROJECT" | "PERSONAL" }) {
+export async function updateMemory(userId: number, memoryId: number, values: { title?: string; content?: string; layer?: "SHORT_TERM" | "TASK" | "PROJECT" | "PERSONAL" | "DOCUMENT" }) {
   const db = await getDb();
   if (!db) return;
   await db.update(memories).set({ ...values, updatedAt: new Date() }).where(and(eq(memories.id, memoryId), eq(memories.userId, userId)));
@@ -253,4 +254,17 @@ export async function listUsageRecords(userId: number) {
   const db = await getDb();
   if (!db) return [];
   return db.select().from(usageRecords).where(eq(usageRecords.userId, userId)).orderBy(desc(usageRecords.createdAt)).limit(100);
+}
+
+export async function registerMobileDevice(userId: number, input: { deviceId: string; label: string; pushEnabled: boolean }) {
+  const db = await getDb();
+  if (!db) return null;
+  await db.insert(mobileDevices).values({ userId, deviceId: input.deviceId, label: input.label, pushEnabled: input.pushEnabled ? 1 : 0 }).onDuplicateKeyUpdate({ set: { label: input.label, pushEnabled: input.pushEnabled ? 1 : 0, lastSyncedAt: new Date(), updatedAt: new Date() } });
+  const rows = await db.select().from(mobileDevices).where(and(eq(mobileDevices.userId, userId), eq(mobileDevices.deviceId, input.deviceId))).limit(1);
+  return rows[0] ?? null;
+}
+
+export async function mobileBootstrap(userId: number) {
+  const [projectList, taskList, memoryList, activityList] = await Promise.all([listProjects(userId), listTasks(userId), listMemories(userId), listActivity(userId)]);
+  return { projects: projectList, tasks: taskList, memories: memoryList, activity: activityList };
 }

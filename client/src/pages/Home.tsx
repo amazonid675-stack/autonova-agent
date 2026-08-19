@@ -9,7 +9,7 @@ import { CheckCircle2, ChevronRight, CircleDotDashed, FileText, FolderPlus, Load
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
-const taskTone: Record<string, string> = { RUNNING: "bg-amber-400", PLANNING: "bg-blue-400", VERIFYING: "bg-violet-400", COMPLETED: "bg-emerald-400", FAILED: "bg-rose-400", CANCELLED: "bg-slate-400", QUEUED: "bg-slate-400" };
+const taskTone: Record<string, string> = { RUNNING: "bg-amber-400", PLANNING: "bg-blue-400", WAITING_FOR_USER: "bg-orange-400", WAITING_FOR_TOOL: "bg-orange-400", VERIFYING: "bg-violet-400", COMPLETED: "bg-emerald-400", FAILED: "bg-rose-400", CANCELLED: "bg-slate-400", QUEUED: "bg-slate-400" };
 
 export default function Home() {
   const utils = trpc.useUtils();
@@ -50,7 +50,7 @@ export default function Home() {
 
   useEffect(() => { if (!selectedProjectId && projectsQuery.data?.[0]) setSelectedProjectId(projectsQuery.data[0].id); }, [projectsQuery.data, selectedProjectId]);
   const tasks = tasksQuery.data ?? [];
-  const activeTask = tasks.find(task => ["RUNNING", "PLANNING", "VERIFYING"].includes(task.status)) ?? tasks[0];
+  const activeTask = tasks.find(task => ["RUNNING", "PLANNING", "WAITING_FOR_USER", "WAITING_FOR_TOOL", "VERIFYING"].includes(task.status)) ?? tasks[0];
   const progress = activeTask ? Math.round((activeTask.steps.filter(step => step.status === "COMPLETED").length / Math.max(activeTask.steps.length, 1)) * 100) : 0;
   const handleFile = (file: File) => { const reader = new FileReader(); reader.onload = () => { const base64 = String(reader.result).split(",")[1]; if (base64) uploadFile.mutate({ name: file.name, mimeType: file.type || "application/octet-stream", contentBase64: base64, projectId: selectedProjectId }); }; reader.readAsDataURL(file); };
 

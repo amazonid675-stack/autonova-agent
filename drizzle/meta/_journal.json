@@ -15,6 +15,20 @@
       "when": 1787167137006,
       "tag": "0001_tense_korg",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1787169039567,
+      "tag": "0002_common_human_cannonball",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "5",
+      "when": 1787169150125,
+      "tag": "0003_broken_sentinels",
+      "breakpoints": true
     }
   ]
 }

@@ -55,10 +55,12 @@ export const agentTasks = mysqlTable("agentTasks", {
   projectId: int("projectId").references(() => projects.id, { onDelete: "set null" }),
   conversationId: int("conversationId").references(() => conversations.id, { onDelete: "set null" }),
   request: text("request").notNull(),
-  status: mysqlEnum("status", ["QUEUED", "PLANNING", "RUNNING", "WAITING_FOR_USER", "VERIFYING", "FAILED", "COMPLETED", "CANCELLED"]).default("QUEUED").notNull(),
+  status: mysqlEnum("status", ["QUEUED", "PLANNING", "RUNNING", "WAITING_FOR_USER", "WAITING_FOR_TOOL", "VERIFYING", "FAILED", "COMPLETED", "CANCELLED"]).default("QUEUED").notNull(),
   model: varchar("model", { length: 160 }),
   finalResult: text("finalResult"),
   errorSummary: text("errorSummary"),
+  retryCount: int("retryCount").default(0).notNull(),
+  nextRetryAt: timestamp("nextRetryAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   completedAt: timestamp("completedAt"),
@@ -81,7 +83,7 @@ export const memories = mysqlTable("memories", {
   userId: int("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
   projectId: int("projectId").references(() => projects.id, { onDelete: "set null" }),
   taskId: int("taskId").references(() => agentTasks.id, { onDelete: "set null" }),
-  layer: mysqlEnum("layer", ["SHORT_TERM", "TASK", "PROJECT", "PERSONAL"]).notNull(),
+  layer: mysqlEnum("layer", ["SHORT_TERM", "TASK", "PROJECT", "PERSONAL", "DOCUMENT"]).notNull(),
   title: varchar("title", { length: 200 }).notNull(),
   content: text("content").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -146,6 +148,20 @@ export const usageRecords = mysqlTable("usageRecords", {
   toolCalls: int("toolCalls").default(0).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
+
+export const mobileDevices = mysqlTable("mobileDevices", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
+  deviceId: varchar("deviceId", { length: 128 }).notNull(),
+  label: varchar("label", { length: 160 }).notNull(),
+  platform: mysqlEnum("platform", ["ANDROID"]).default("ANDROID").notNull(),
+  pushEnabled: int("pushEnabled").default(0).notNull(),
+  lastSyncedAt: timestamp("lastSyncedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, table => ({
+  userDeviceUnique: uniqueIndex("mobile_devices_user_device_unique").on(table.userId, table.deviceId),
+}));
 
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;

@@ -179,6 +179,19 @@ export const agentRouter = router({
       await db.createActivity(ctx.user.id, { taskId: input.taskId, eventType: "TASK_FAILED", title: "Task marked as failed", detail: "A user-provided failure summary was recorded." });
       return { success: true };
     }),
+    waitForTool: protectedProcedure.input(z.object({ taskId: z.number().int().positive(), toolKey: z.string().trim().min(2).max(80), summary: z.string().trim().min(3).max(500) })).mutation(async ({ ctx, input }) => {
+      requireRecord(await db.getTask(ctx.user.id, input.taskId));
+      await db.updateTask(ctx.user.id, input.taskId, { status: "WAITING_FOR_TOOL" });
+      await db.createActivity(ctx.user.id, { taskId: input.taskId, eventType: "WAITING_FOR_TOOL", title: `Awaiting approved tool: ${input.toolKey}`, detail: redactSecrets(input.summary) });
+      return { success: true };
+    }),
+    retry: protectedProcedure.input(z.object({ taskId: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
+      const task = requireRecord(await db.getTask(ctx.user.id, input.taskId));
+      if (task.status !== "FAILED") throw new TRPCError({ code: "BAD_REQUEST", message: "Only a failed task can be retried." });
+      await db.updateTask(ctx.user.id, input.taskId, { status: "PLANNING", retryCount: task.retryCount + 1, errorSummary: null, nextRetryAt: null });
+      await db.createActivity(ctx.user.id, { taskId: input.taskId, eventType: "TASK_RETRY", title: "Task retry requested", detail: `Retry ${task.retryCount + 1} will be planned again with the current permissions.` });
+      return { success: true, status: "PLANNING" as const };
+    }),
     cancel: protectedProcedure.input(z.object({ taskId: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
       await db.updateTask(ctx.user.id, input.taskId, { status: "CANCELLED" });
       await db.createActivity(ctx.user.id, { taskId: input.taskId, eventType: "TASK_CANCELLED", title: "Task cancelled by user" });
@@ -187,12 +200,12 @@ export const agentRouter = router({
   }),
   memory: router({
     list: protectedProcedure.input(z.object({ projectId: z.number().int().positive().optional() }).optional()).query(({ ctx, input }) => db.listMemories(ctx.user.id, input?.projectId)),
-    create: protectedProcedure.input(z.object({ layer: z.enum(["SHORT_TERM", "TASK", "PROJECT", "PERSONAL"]), title: z.string().trim().min(2).max(200), content: z.string().trim().min(2).max(5000), projectId: z.number().int().positive().optional(), taskId: z.number().int().positive().optional() })).mutation(async ({ ctx, input }) => {
+    create: protectedProcedure.input(z.object({ layer: z.enum(["SHORT_TERM", "TASK", "PROJECT", "PERSONAL", "DOCUMENT"]), title: z.string().trim().min(2).max(200), content: z.string().trim().min(2).max(5000), projectId: z.number().int().positive().optional(), taskId: z.number().int().positive().optional() })).mutation(async ({ ctx, input }) => {
       const memory = requireRecord(await db.createMemory(ctx.user.id, input));
       await db.createActivity(ctx.user.id, { eventType: "MEMORY_SAVED", title: `Saved ${input.layer.toLowerCase().replace("_", " ")} memory`, visibility: "ADVANCED" });
       return memory;
     }),
-    update: protectedProcedure.input(z.object({ memoryId: z.number().int().positive(), title: z.string().trim().min(2).max(200).optional(), content: z.string().trim().min(2).max(5000).optional(), layer: z.enum(["SHORT_TERM", "TASK", "PROJECT", "PERSONAL"]).optional() })).mutation(async ({ ctx, input }) => {
+    update: protectedProcedure.input(z.object({ memoryId: z.number().int().positive(), title: z.string().trim().min(2).max(200).optional(), content: z.string().trim().min(2).max(5000).optional(), layer: z.enum(["SHORT_TERM", "TASK", "PROJECT", "PERSONAL", "DOCUMENT"]).optional() })).mutation(async ({ ctx, input }) => {
       const { memoryId, ...values } = input;
       await db.updateMemory(ctx.user.id, memoryId, values);
       return { success: true };
