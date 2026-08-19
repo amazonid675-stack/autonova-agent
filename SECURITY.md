@@ -14,6 +14,6 @@ The tool registry uses per-user **ASK**, **ALLOW**, and **DENY** policies. Sensi
 
 File bytes are uploaded to object storage; database rows contain names, types, sizes, and storage references only. Text-like files and PDFs are supplied to the model through short-lived server-authorized URLs when the user explicitly attaches them. External provider endpoints must use public HTTPS and are rejected for localhost, local domains, and common private-network address ranges.
 
-## Known Operational Constraint
+## Streaming Boundary
 
-The managed built-in language-model proxy returns complete responses rather than token-level SSE. While it is processing, the interface shows concise status updates such as context review and response composition. A future provider-specific SSE adapter can add token-level streaming where a configured provider supports it, without exposing hidden reasoning.
+The managed built-in language-model proxy returns a complete response, while the protected streaming endpoint emits safe status events during that work. A configured OpenAI-compatible provider can use provider SSE and relay visible response deltas through the same protected endpoint. Neither path exposes hidden reasoning; both present only concise progress labels and the user-visible final response.

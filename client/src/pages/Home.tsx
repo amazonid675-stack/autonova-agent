@@ -19,6 +19,9 @@ export default function Home() {
   const [taskRequest, setTaskRequest] = useState("");
   const [newProjectName, setNewProjectName] = useState("");
   const [showNewProject, setShowNewProject] = useState(false);
+  const [streaming, setStreaming] = useState(false);
+  const [pendingUserMessage, setPendingUserMessage] = useState("");
+  const [streamedMessage, setStreamedMessage] = useState("");
   const projectsQuery = trpc.agent.projects.list.useQuery();
   const messagesQuery = trpc.agent.conversations.messages.useQuery({ conversationId: conversationId ?? -1 }, { enabled: Boolean(conversationId) });
   const tasksQuery = trpc.agent.tasks.list.useQuery(selectedProjectId ? { projectId: selectedProjectId } : undefined);
@@ -28,6 +31,22 @@ export default function Home() {
   const sendChat = trpc.agent.chat.send.useMutation({ onSuccess: async result => { setConversationId(result.conversationId); setAttachments([]); await Promise.all([utils.agent.conversations.messages.invalidate(), utils.agent.conversations.list.invalidate(), utils.agent.activity.list.invalidate(), utils.agent.usage.summary.invalidate()]); }, onError: error => toast.error(error.message) });
   const uploadFile = trpc.agent.files.upload.useMutation({ onSuccess: async file => { setAttachments(current => [...current, file.name]); toast.success(`${file.name} is available to the agent`); await utils.agent.files.list.invalidate(); }, onError: error => toast.error(error.message) });
   const createTask = trpc.agent.tasks.create.useMutation({ onSuccess: async () => { setTaskRequest(""); await Promise.all([utils.agent.tasks.list.invalidate(), utils.agent.activity.list.invalidate(), utils.agent.usage.summary.invalidate()]); toast.success("Agent task is running"); }, onError: error => toast.error(error.message) });
+
+  const streamChat = async (content: string) => {
+    setStreaming(true); setPendingUserMessage(content); setStreamedMessage("");
+    try {
+      const response = await fetch("/api/agent/stream", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ content, projectId: selectedProjectId, conversationId }) });
+      if (!response.ok || !response.body) throw new Error("The agent stream could not be started.");
+      const reader = response.body.getReader(); const decoder = new TextDecoder(); let buffer = "";
+      for (;;) {
+        const chunk = await reader.read(); if (chunk.done) break;
+        buffer += decoder.decode(chunk.value, { stream: true }); const events = buffer.split("\n\n"); buffer = events.pop() ?? "";
+        events.forEach(event => { const payload = event.split("\n").find(line => line.startsWith("data: "))?.slice(6); if (!payload) return; try { const data = JSON.parse(payload) as { type: string; conversationId?: number; content?: string; message?: string }; if (data.type === "metadata" && data.conversationId) setConversationId(data.conversationId); if (data.type === "message") setStreamedMessage(data.content ?? ""); if (data.type === "error") toast.error(data.message ?? "Unable to complete the agent response."); } catch { /* Ignore malformed SSE frames. */ } });
+      }
+      await Promise.all([utils.agent.conversations.messages.invalidate(), utils.agent.conversations.list.invalidate(), utils.agent.activity.list.invalidate(), utils.agent.usage.summary.invalidate()]);
+    } catch (error) { toast.error(error instanceof Error ? error.message : "Unable to complete the agent response."); }
+    finally { setStreaming(false); setPendingUserMessage(""); setStreamedMessage(""); }
+  };
 
   useEffect(() => { if (!selectedProjectId && projectsQuery.data?.[0]) setSelectedProjectId(projectsQuery.data[0].id); }, [projectsQuery.data, selectedProjectId]);
   const tasks = tasksQuery.data ?? [];
@@ -54,7 +73,7 @@ export default function Home() {
     <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_330px]">
       <section className="glass-panel min-h-[650px] overflow-hidden rounded-[1.5rem]">
         <div className="flex items-center gap-2 overflow-x-auto border-b border-border/65 px-4 py-3"><span className="mr-1 text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">Context</span>{projectsQuery.data?.map(project => <button key={project.id} onClick={() => { setSelectedProjectId(project.id); setConversationId(undefined); }} className={`whitespace-nowrap rounded-full px-3 py-1.5 text-xs transition ${selectedProjectId === project.id ? "bg-foreground text-background" : "bg-muted/70 text-muted-foreground hover:text-foreground"}`}>{project.name}</button>)}{!projectsQuery.isLoading && !projectsQuery.data?.length && <button onClick={() => setShowNewProject(true)} className="rounded-full bg-primary/10 px-3 py-1.5 text-xs text-primary hover:bg-primary/15">Create your first workspace</button>}</div>
-        <div className="grid min-h-[596px] grid-rows-[minmax(0,1fr)_auto]"><AIChatBox messages={(messagesQuery.data ?? []).map(message => ({ role: message.role, content: message.content }))} onSendMessage={content => sendChat.mutate({ content, projectId: selectedProjectId, conversationId })} onSendContext={input => sendChat.mutate({ ...input, projectId: selectedProjectId, conversationId })} onFileSelected={handleFile} attachments={attachments} isLoading={sendChat.isPending || uploadFile.isPending} height="100%" className="rounded-none border-0 shadow-none" placeholder="Give Autonova a task, a question, or a file to work with…" emptyStateMessage="What would you like to move forward today?" suggestedPrompts={["Turn my rough idea into a plan", "Review this project and identify the next step", "Summarize the files I attach"]} /></div>
+        <div className="grid min-h-[596px] grid-rows-[minmax(0,1fr)_auto]"><AIChatBox messages={[...(messagesQuery.data ?? []).map(message => ({ role: message.role, content: message.content })), ...(pendingUserMessage ? [{ role: "user" as const, content: pendingUserMessage }] : []), ...(streamedMessage ? [{ role: "assistant" as const, content: streamedMessage }] : [])]} onSendMessage={streamChat} onSendContext={input => input.url || input.attachmentNames?.length ? sendChat.mutate({ ...input, projectId: selectedProjectId, conversationId }) : streamChat(input.content)} onFileSelected={handleFile} attachments={attachments} isLoading={streaming || sendChat.isPending || uploadFile.isPending} height="100%" className="rounded-none border-0 shadow-none" placeholder="Give Autonova a task, a question, or a file to work with…" emptyStateMessage="What would you like to move forward today?" suggestedPrompts={["Turn my rough idea into a plan", "Review this project and identify the next step", "Summarize the files I attach"]} /></div>
       </section>
 
       <aside className="space-y-5">

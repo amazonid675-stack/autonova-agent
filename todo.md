@@ -17,4 +17,4 @@
 - [x] Add Vitest coverage for task validation, permission policy handling, secret redaction, and protected core procedures.
 - [x] Run type checks, automated tests, visual QA, and responsive QA; refine any issues found.
 - [x] Create implementation documentation and a final checkpoint for delivery.
-- [ ] Add provider-specific token-level SSE transport when the selected model provider supports it; the current built-in proxy reports safe action-status updates while generating a complete response.
+- [x] Add provider-specific token-level SSE transport for OpenAI-compatible providers while retaining safe built-in status streaming and no hidden-reasoning exposure.
