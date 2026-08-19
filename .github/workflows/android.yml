@@ -36,3 +36,9 @@ jobs:
         run: gradle wrapper --gradle-version 8.10.2
       - name: Run Android unit tests and compile instrumentation tests
         run: ./gradlew --no-daemon :app:testDebugUnitTest :app:assembleDebugAndroidTest
+      - name: Execute Android instrumentation tests
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 29
+          arch: x86_64
+          script: cd android/Autonova && ./gradlew --no-daemon connectedDebugAndroidTest
