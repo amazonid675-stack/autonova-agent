@@ -17,13 +17,14 @@ class AutonovaViewModel(application: Application) : AndroidViewModel(application
     val projects = repository.projects
     val memories = repository.memories
     val activity = repository.activity
+    val files = repository.files
+    val tools = repository.tools
+    val provider = repository.provider
     init { AgentSyncWorker.enqueue(application) }
 
     fun submit(text: String) {
         if (text.isBlank()) return
-        val now = System.currentTimeMillis()
-        repository.appendLocalMessage(ChatMessage("local-$now", "user", text, now))
-        if (text.lowercase().startsWith("build") || text.lowercase().startsWith("create")) repository.createLocalTask(text)
+        viewModelScope.launch { repository.submit(text) }
     }
     fun refresh() = viewModelScope.launch { if (!repository.refresh()) AgentSyncWorker.enqueue(getApplication()) }
 }
