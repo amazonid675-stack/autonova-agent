@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
-import { Loader2, Send, User, Sparkles } from "lucide-react";
+import { FileText, Link2, Loader2, Paperclip, Send, Sparkles, User, X } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { Streamdown } from "streamdown";
 
@@ -26,6 +26,12 @@ export type AIChatBoxProps = {
    * Typically you'll call a tRPC mutation here to invoke the LLM.
    */
   onSendMessage: (content: string) => void;
+
+  onSendContext?: (input: { content: string; url?: string; attachmentNames?: string[] }) => void;
+
+  onFileSelected?: (file: File) => void;
+
+  attachments?: string[];
 
   /**
    * Whether the AI is currently generating a response
@@ -119,12 +125,26 @@ export function AIChatBox({
   height = "600px",
   emptyStateMessage = "Start a conversation with AI",
   suggestedPrompts,
+  onFileSelected,
+  attachments = [],
+  onSendContext,
 }: AIChatBoxProps) {
   const [input, setInput] = useState("");
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const inputAreaRef = useRef<HTMLFormElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [showUrlInput, setShowUrlInput] = useState(false);
+  const [referenceUrl, setReferenceUrl] = useState("");
+  const [agentStatusIndex, setAgentStatusIndex] = useState(0);
+  const agentStatuses = ["Understanding your request", "Reviewing approved context", "Composing a response"];
+
+  useEffect(() => {
+    if (!isLoading) { setAgentStatusIndex(0); return; }
+    const interval = window.setInterval(() => setAgentStatusIndex(index => (index + 1) % agentStatuses.length), 1200);
+    return () => window.clearInterval(interval);
+  }, [isLoading]);
 
   // Filter out system messages
   const displayMessages = messages.filter((msg) => msg.role !== "system");
@@ -170,8 +190,14 @@ export function AIChatBox({
     const trimmedInput = input.trim();
     if (!trimmedInput || isLoading) return;
 
-    onSendMessage(trimmedInput);
+    if (onSendContext) {
+      onSendContext({ content: trimmedInput, url: referenceUrl.trim() || undefined, attachmentNames: attachments.length ? attachments : undefined });
+    } else {
+      onSendMessage(trimmedInput);
+    }
     setInput("");
+    setReferenceUrl("");
+    setShowUrlInput(false);
 
     // Scroll immediately after sending
     scrollToBottom();
@@ -292,8 +318,9 @@ export function AIChatBox({
                   <div className="size-8 shrink-0 mt-1 rounded-full bg-primary/10 flex items-center justify-center">
                     <Sparkles className="size-4 text-primary" />
                   </div>
-                  <div className="rounded-lg bg-muted px-4 py-2.5">
-                    <Loader2 className="size-4 animate-spin text-muted-foreground" />
+                  <div className="flex items-center gap-2 rounded-lg bg-muted px-4 py-2.5">
+                    <Loader2 className="size-4 animate-spin text-primary" />
+                    <span className="text-xs text-muted-foreground">{agentStatuses[agentStatusIndex]}</span>
                   </div>
                 </div>
               )}
@@ -306,29 +333,29 @@ export function AIChatBox({
       <form
         ref={inputAreaRef}
         onSubmit={handleSubmit}
-        className="flex gap-2 p-4 border-t bg-background/50 items-end"
+        className="p-3 border-t border-border/70 bg-background/50"
       >
-        <Textarea
-          ref={textareaRef}
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder={placeholder}
-          className="flex-1 max-h-32 resize-none min-h-9"
-          rows={1}
-        />
-        <Button
-          type="submit"
-          size="icon"
-          disabled={!input.trim() || isLoading}
-          className="shrink-0 h-[38px] w-[38px]"
-        >
-          {isLoading ? (
-            <Loader2 className="size-4 animate-spin" />
-          ) : (
-            <Send className="size-4" />
-          )}
-        </Button>
+        {(attachments.length > 0 || showUrlInput) && <div className="mb-2 flex flex-wrap items-center gap-2 px-1">
+          {attachments.map(name => <span key={name} className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-2.5 py-1 text-xs text-primary"><FileText className="size-3" />{name}</span>)}
+          {showUrlInput && <div className="flex min-w-[220px] flex-1 items-center gap-1 rounded-xl bg-muted/70 px-2 py-1"><Link2 className="size-3.5 text-muted-foreground" /><input value={referenceUrl} onChange={event => setReferenceUrl(event.target.value)} placeholder="Paste a reference URL" className="min-w-0 flex-1 bg-transparent text-xs outline-none" /><button type="button" onClick={() => { setShowUrlInput(false); setReferenceUrl(""); }} className="text-muted-foreground hover:text-foreground"><X className="size-3.5" /></button></div>}
+        </div>}
+        <div className="flex gap-2 items-end">
+          <input ref={fileInputRef} className="hidden" type="file" onChange={event => { const file = event.target.files?.[0]; if (file) onFileSelected?.(file); event.currentTarget.value = ""; }} />
+          <button type="button" onClick={() => fileInputRef.current?.click()} className="mb-0.5 flex size-9 shrink-0 items-center justify-center rounded-xl text-muted-foreground transition hover:bg-muted hover:text-foreground" aria-label="Attach a file"><Paperclip className="size-4" /></button>
+          <button type="button" onClick={() => setShowUrlInput(value => !value)} className="mb-0.5 flex size-9 shrink-0 items-center justify-center rounded-xl text-muted-foreground transition hover:bg-muted hover:text-foreground" aria-label="Add a URL"><Link2 className="size-4" /></button>
+          <Textarea
+            ref={textareaRef}
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder={placeholder}
+            className="flex-1 max-h-32 resize-none min-h-10 border-0 bg-muted/70 shadow-none focus-visible:ring-1"
+            rows={1}
+          />
+          <Button type="submit" size="icon" disabled={!input.trim() || isLoading} className="shrink-0 h-10 w-10 rounded-xl">
+            {isLoading ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
+          </Button>
+        </div>
       </form>
     </div>
   );
