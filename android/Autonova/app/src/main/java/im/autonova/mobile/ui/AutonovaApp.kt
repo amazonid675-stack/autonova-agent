@@ -55,8 +55,8 @@ private val Cloud = Color(0xFFF2F0FF)
                 "Command" -> CommandScreen(viewModel, Modifier.padding(padding))
                 "Tasks" -> TasksScreen(viewModel, Modifier.padding(padding))
                 "Projects" -> DetailScreen("Projects", "Workspaces preserve conversations, files, tools, and durable project context.", Modifier.padding(padding))
-                "Memory" -> DetailScreen("Memory", "Review, edit, or remove the information the agent may carry forward.", Modifier.padding(padding))
-                else -> MoreScreen(Modifier.padding(padding))
+                "Memory" -> MemoryScreen(viewModel, Modifier.padding(padding))
+                else -> MoreScreen(viewModel, Modifier.padding(padding))
             }
         }
     }
@@ -106,9 +106,12 @@ private val Cloud = Color(0xFFF2F0FF)
     }
 }
 
-@Composable private fun MoreScreen(modifier: Modifier) {
+@Composable private fun MoreScreen(viewModel: AutonovaViewModel, modifier: Modifier) {
+    val activity by viewModel.activity.collectAsState()
     val surfaces = listOf("Files" to "Explicit attachment and document context.", "Tools" to "Permissioned capabilities with Ask, Allow, and Deny.", "GitHub" to "Read-only public context; writes require approval.", "Settings" to "Encrypted mobile configuration and provider session.", "Activity" to "Visible action summaries without hidden reasoning.")
-    Column(modifier.fillMaxSize().padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) { Text("More", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold); surfaces.forEach { (title, detail) -> Card(colors = CardDefaults.cardColors(containerColor = Panel)) { Column(Modifier.padding(16.dp)) { Text(title, fontWeight = FontWeight.SemiBold); Text(detail, color = Color.LightGray, style = MaterialTheme.typography.bodySmall) } } } }
+    Column(modifier.fillMaxSize().padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) { Text("More", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold); surfaces.forEach { (title, detail) -> Card(colors = CardDefaults.cardColors(containerColor = Panel)) { Column(Modifier.padding(16.dp)) { Text(title, fontWeight = FontWeight.SemiBold); Text(detail, color = Color.LightGray, style = MaterialTheme.typography.bodySmall) } } }; if (activity.isNotEmpty()) { Text("Recent activity", color = Lavender, style = MaterialTheme.typography.labelSmall); activity.take(3).forEach { item -> Text(item.title, color = Cloud, style = MaterialTheme.typography.bodySmall) } } }
 }
 
 @Composable private fun DetailScreen(title: String, description: String, modifier: Modifier) { Column(modifier.fillMaxSize().padding(20.dp)) { Text(title, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold); Spacer(Modifier.height(12.dp)); Text(description, color = Color.LightGray) } }
+
+@Composable private fun MemoryScreen(viewModel: AutonovaViewModel, modifier: Modifier) { val memories by viewModel.memories.collectAsState(); Column(modifier.fillMaxSize().padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) { Text("Memory", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold); Text("Review, edit, or remove the information the agent may carry forward.", color = Color.LightGray); if (memories.isEmpty()) Text("No synchronized memories yet.", color = Color.LightGray) else LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) { items(memories) { memory -> Card(colors = CardDefaults.cardColors(containerColor = Panel)) { Column(Modifier.padding(14.dp)) { Text(memory.layer, color = Lavender, style = MaterialTheme.typography.labelSmall); Text(memory.title); Text(memory.content, color = Color.LightGray, style = MaterialTheme.typography.bodySmall) } } } } } }

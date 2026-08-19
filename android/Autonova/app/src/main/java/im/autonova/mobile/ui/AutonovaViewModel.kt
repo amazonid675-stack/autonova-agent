@@ -15,6 +15,8 @@ class AutonovaViewModel(application: Application) : AndroidViewModel(application
     val messages = repository.messages
     val tasks = repository.tasks
     val projects = repository.projects
+    val memories = repository.memories
+    val activity = repository.activity
     init { AgentSyncWorker.enqueue(application) }
 
     fun submit(text: String) {

@@ -265,6 +265,6 @@ export async function registerMobileDevice(userId: number, input: { deviceId: st
 }
 
 export async function mobileBootstrap(userId: number) {
-  const [projectList, taskList, memoryList, activityList] = await Promise.all([listProjects(userId), listTasks(userId), listMemories(userId), listActivity(userId)]);
-  return { projects: projectList, tasks: taskList, memories: memoryList, activity: activityList };
+  const [projectList, taskList, memoryList, activityList, fileList, permissions, provider] = await Promise.all([listProjects(userId), listTasks(userId), listMemories(userId), listActivity(userId), listUploadedFiles(userId), listToolPermissions(userId), latestProvider(userId)]);
+  return { projects: projectList, tasks: taskList, memories: memoryList, activity: activityList, files: fileList, toolPermissions: permissions, provider: provider ? { name: provider.name, providerType: provider.providerType, activeModel: provider.activeModel, costMode: provider.costMode, hasApiKey: Boolean(provider.encryptedApiKey) } : null };
 }

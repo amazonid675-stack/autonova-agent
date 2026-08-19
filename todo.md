@@ -27,6 +27,9 @@
 - [x] Create a private GitHub repository for the full Autonova source tree and push the verified cross-platform implementation.
 - [x] Add an Android GitHub Actions workflow that validates the native module on pull requests without exposing secrets.
 - [x] Document the GitHub branching, review, and Android build workflow for continued development.
-- [ ] Connect the Android repository to authenticated mobile backend contracts and synchronize chat, tasks, projects, memory, files, settings, activity, and tool data.
-- [ ] Wire Room into the active Android repository and implement a safe WorkManager queue for offline-capable refresh and retry foundations.
-- [ ] Add Android unit/UI coverage for mobile navigation and secure configuration behavior, then rerun the GitHub Android validation workflow.
+- [x] Connect the Android repository to authenticated mobile backend contracts and synchronize chat, tasks, projects, memory, files, settings, activity, and tool data.
+- [x] Wire Room into the active Android repository and implement a safe WorkManager queue for offline-capable refresh and retry foundations.
+- [x] Add Android unit/UI coverage for mobile navigation and secure configuration behavior, then rerun the GitHub Android validation workflow.
+- [ ] Connect Android chat streaming and the Files, Memory, Tools, Settings, and Activity surfaces to authenticated mobile backend flows.
+- [ ] Extend Room and WorkManager synchronization to cache and surface projects, memories, activity, and queued safe mobile actions.
+- [ ] Add Android instrumentation coverage for encrypted SecureConfig endpoint, session-cookie, and durable device-ID behavior, then rerun CI.
