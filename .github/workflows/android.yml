@@ -34,5 +34,5 @@ jobs:
         run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
       - name: Generate temporary Gradle wrapper
         run: gradle wrapper --gradle-version 8.10.2
-      - name: Run Android unit tests
-        run: ./gradlew --no-daemon :app:testDebugUnitTest
+      - name: Run Android unit tests and compile instrumentation tests
+        run: ./gradlew --no-daemon :app:testDebugUnitTest :app:assembleDebugAndroidTest
