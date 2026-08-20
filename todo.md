@@ -40,6 +40,9 @@
 - [x] Run Android instrumentation tests on an emulator in GitHub Actions so secure configuration rejection behavior is executed and verified.
 - [x] Add Android scoped-storage access through a user-selected folder, persist the granted URI safely, and surface selected files in the app.
 - [x] Add explicit-confirmation device actions for creating, sharing, opening, and deleting files in the user-selected folder.
-- [ ] Require explicit confirmation before creating, opening, or sharing a local file, and verify those confirmation paths in Android tests.
-- [ ] Build and attach an installable Android debug APK containing the verified device-capability update.
-- [ ] Audit and complete Android access to all Autonova mobile workflows: chat, tasks, projects, memory, files, tools, provider status, activity, secure settings, storage, and confirmed device actions.
+- [x] Require explicit confirmation before creating, opening, or sharing a local file, and verify those confirmation paths in Android tests.
+- [x] Build and attach an installable Android debug APK containing the verified device-capability update.
+- [x] Audit and complete Android access to all Autonova mobile workflows: chat, tasks, projects, memory, files, tools, provider status, activity, secure settings, storage, and confirmed device actions.
+- [ ] Complete Android memory edit mode so saving an edited memory calls the protected update endpoint rather than creating a duplicate.
+- [ ] Add Android UI coverage that exercises the Files & Storage action paths and confirms create, open, share, and delete require approval.
+- [ ] Deliver the verified Autonova debug APK attachment to the user with installation guidance.

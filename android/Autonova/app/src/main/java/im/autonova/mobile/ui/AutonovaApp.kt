@@ -137,13 +137,14 @@ private sealed interface LocalStorageAction {
 }
 
 @Composable private fun MemoryScreen(viewModel: AutonovaViewModel, modifier: Modifier) {
-    val memories by viewModel.memories.collectAsState(); var title by remember { mutableStateOf("") }; var content by remember { mutableStateOf("") }; var deleting by remember { mutableStateOf<MemoryItem?>(null) }
+    val memories by viewModel.memories.collectAsState(); var title by remember { mutableStateOf("") }; var content by remember { mutableStateOf("") }; var editingId by remember { mutableStateOf<String?>(null) }; var deleting by remember { mutableStateOf<MemoryItem?>(null) }
     Column(modifier.fillMaxSize().padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         PageHeader("Persistent context", "Memory", "Review what may carry forward, add personal context, and remove memories you no longer want retained.")
         OutlinedTextField(value = title, onValueChange = { title = it }, modifier = Modifier.fillMaxWidth(), label = { Text("Memory title") })
         OutlinedTextField(value = content, onValueChange = { content = it }, modifier = Modifier.fillMaxWidth(), label = { Text("Memory content") }, minLines = 2)
-        Button(onClick = { viewModel.createMemory(title, content); title = ""; content = "" }, enabled = title.isNotBlank() && content.isNotBlank()) { Text("Save memory") }
-        if (memories.isEmpty()) Text("No synchronized memories yet.", color = Muted) else LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) { items(memories, key = { it.id }) { memory -> SurfaceCard { Text(memory.layer, color = Lavender, style = MaterialTheme.typography.labelSmall); Text(memory.title, fontWeight = FontWeight.SemiBold); Text(memory.content, color = Muted, style = MaterialTheme.typography.bodySmall); Row { TextButton(onClick = { title = memory.title; content = memory.content }) { Text("Edit") }; TextButton(onClick = { deleting = memory }) { Text("Remove") } } } } }
+        Button(onClick = { val existingId = editingId; if (existingId == null) viewModel.createMemory(title, content) else viewModel.updateMemory(existingId, title, content, "PERSONAL"); title = ""; content = ""; editingId = null }, enabled = title.isNotBlank() && content.isNotBlank()) { Text(if (editingId == null) "Save memory" else "Update memory") }
+        if (editingId != null) TextButton(onClick = { title = ""; content = ""; editingId = null }) { Text("Cancel edit") }
+        if (memories.isEmpty()) Text("No synchronized memories yet.", color = Muted) else LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) { items(memories, key = { it.id }) { memory -> SurfaceCard { Text(memory.layer, color = Lavender, style = MaterialTheme.typography.labelSmall); Text(memory.title, fontWeight = FontWeight.SemiBold); Text(memory.content, color = Muted, style = MaterialTheme.typography.bodySmall); Row { TextButton(onClick = { title = memory.title; content = memory.content; editingId = memory.id }) { Text("Edit") }; TextButton(onClick = { deleting = memory }) { Text("Remove") } } } } }
     }
     deleting?.let { memory -> ConfirmDialog("Remove memory?", "This removes ‘${memory.title}’ from your Autonova account.", "Remove", { viewModel.deleteMemory(memory.id); deleting = null }) { deleting = null } }
 }
