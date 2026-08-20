@@ -25,5 +25,6 @@ class SecureConfigInstrumentedTest {
         assertNotEquals("", config.deviceId())
         try { config.saveApiBaseUrl("http://localhost:3000"); fail("Unsafe endpoint should be rejected") } catch (_: IllegalArgumentException) { }
         try { config.saveSessionCookie("access-token") ; fail("Invalid cookie should be rejected") } catch (_: IllegalArgumentException) { }
+        try { config.saveStorageTree("https://example.com/documents"); fail("Non-document URI should be rejected") } catch (_: IllegalArgumentException) { }
     }
 }

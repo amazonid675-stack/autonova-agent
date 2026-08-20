@@ -18,7 +18,7 @@ class AutonovaViewModel(application: Application) : AndroidViewModel(application
     private val repository = AgentRepository(AgentDatabase.create(application).cacheDao(), config)
     private val _configured = MutableStateFlow(config.isConfigured())
     val configured: StateFlow<Boolean> = _configured.asStateFlow()
-    val messages = repository.messages; val tasks = repository.tasks; val projects = repository.projects; val memories = repository.memories; val activity = repository.activity; val files = repository.files; val tools = repository.tools; val provider = repository.provider
+    val messages = repository.messages; val tasks = repository.tasks; val projects = repository.projects; val memories = repository.memories; val activity = repository.activity; val files = repository.files; val tools = repository.tools; val provider = repository.provider; val usage = repository.usage; val github = repository.github; val generatedImageUrl = repository.generatedImageUrl
     init { AgentSyncWorker.enqueue(application) }
     fun submit(text: String) { if (text.isNotBlank()) viewModelScope.launch { repository.submit(text) } }
     fun refresh() = viewModelScope.launch { if (!repository.refresh()) AgentSyncWorker.enqueue(getApplication()) }
@@ -26,9 +26,14 @@ class AutonovaViewModel(application: Application) : AndroidViewModel(application
     fun clearConnection() { config.clearSession(); _configured.value = false }
     fun createProject(name: String, description: String) = viewModelScope.launch { repository.createProject(name, description) }
     fun createTask(request: String) = viewModelScope.launch { repository.createTask(request) }
+    fun changeTaskStatus(id: String, status: String) = viewModelScope.launch { repository.changeTaskStatus(id, status) }
     fun createMemory(title: String, content: String, layer: String = "PERSONAL") = viewModelScope.launch { repository.createMemory(title, content, layer) }
     fun updateMemory(id: String, title: String, content: String, layer: String) = viewModelScope.launch { repository.updateMemory(id, title, content, layer) }
     fun deleteMemory(id: String) = viewModelScope.launch { repository.deleteMemory(id) }
     fun setToolPolicy(key: String, policy: String) = viewModelScope.launch { repository.setToolPolicy(key, policy) }
     fun uploadLocalFile(document: LocalDocument, bytes: ByteArray) = viewModelScope.launch { repository.uploadFile(document, bytes) }
+    fun saveProvider(name: String, providerType: String, baseUrl: String, model: String, apiKey: String, costMode: String) = viewModelScope.launch { repository.saveProvider(name, providerType, baseUrl, model, apiKey, costMode) }
+    fun refreshUsage() = viewModelScope.launch { repository.refreshUsage() }
+    fun generateImage(prompt: String) = viewModelScope.launch { repository.generateImage(prompt) }
+    fun inspectGitHub(repository: String) = viewModelScope.launch { repository.inspectGitHub(repository) }
 }
