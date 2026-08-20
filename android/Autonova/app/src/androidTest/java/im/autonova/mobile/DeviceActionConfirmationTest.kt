@@ -35,7 +35,7 @@ class DeviceActionConfirmationTest {
     @Test fun files_storage_controls_route_every_local_action_through_confirmation() {
         compose.setContent {
             var pendingAction by mutableStateOf<LocalStorageAction?>(null)
-            FilesAndStorageActionControls(null, true) { pendingAction = it }
+            FilesAndStorageActionControls(null, true, onActionRequested = { pendingAction = it })
             FilesAndStorageActionControls(document(), true, { pendingAction = it })
             LocalStorageActionConfirmation(pendingAction, "draft", {}, {}, {}, {}, { pendingAction = null })
         }
