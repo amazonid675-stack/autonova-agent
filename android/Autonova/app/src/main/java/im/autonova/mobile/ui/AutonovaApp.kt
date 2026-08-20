@@ -59,7 +59,7 @@ private val Panel = Color(0xFF151521)
 private val Lavender = Color(0xFFA98BFF)
 private val Cloud = Color(0xFFF2F0FF)
 private val Muted = Color(0xFFB8B4C8)
-private sealed interface LocalStorageAction {
+internal sealed interface LocalStorageAction {
     data object CreateNote : LocalStorageAction
     data class Open(val document: LocalDocument) : LocalStorageAction
     data class Share(val document: LocalDocument) : LocalStorageAction
@@ -175,11 +175,15 @@ private sealed interface LocalStorageAction {
         localFiles.forEach { document -> SurfaceCard { Text(document.name, fontWeight = FontWeight.SemiBold); Text("${document.mimeType} · ${document.sizeBytes} bytes", color = Muted, style = MaterialTheme.typography.bodySmall); Row { TextButton(onClick = { pendingAction = LocalStorageAction.Open(document) }) { Text("Open") }; TextButton(onClick = { pendingAction = LocalStorageAction.Share(document) }) { Text("Share") }; TextButton(onClick = { storage.readBytes(document)?.let { viewModel.uploadLocalFile(document, it) } }) { Text("Upload") }; TextButton(onClick = { pendingAction = LocalStorageAction.Delete(document) }) { Text("Delete") } } } }
     } else Text("Choose a document-provider folder to enable scoped local storage actions.", color = Muted)
     if (remoteFiles.isNotEmpty()) { Text("Autonova workspace files", color = Lavender, style = MaterialTheme.typography.labelSmall); remoteFiles.forEach { file -> RemoteFileRow(file) } }
-    when (val action = pendingAction) {
-        LocalStorageAction.CreateNote -> ConfirmDialog("Create local note?", "Create ‘${noteTitle.ifBlank { "Autonova note" }}.txt’ in the selected folder?", "Create", { storage.createNote(noteTitle, noteContent); noteTitle = ""; noteContent = ""; localFiles = storage.listFiles(); pendingAction = null }) { pendingAction = null }
-        is LocalStorageAction.Open -> ConfirmDialog("Open local file?", "Open ‘${action.document.name}’ with an installed application?", "Open", { runCatching { storage.open(action.document) }; pendingAction = null }) { pendingAction = null }
-        is LocalStorageAction.Share -> ConfirmDialog("Share local file?", "Share ‘${action.document.name}’ with another application?", "Share", { runCatching { storage.share(action.document) }; pendingAction = null }) { pendingAction = null }
-        is LocalStorageAction.Delete -> ConfirmDialog("Delete local file?", "This permanently deletes ‘${action.document.name}’ from the folder you selected.", "Delete", { storage.delete(action.document); localFiles = storage.listFiles(); pendingAction = null }) { pendingAction = null }
+    LocalStorageActionConfirmation(pendingAction, noteTitle, { storage.createNote(noteTitle, noteContent); noteTitle = ""; noteContent = ""; localFiles = storage.listFiles(); pendingAction = null }, { document -> runCatching { storage.open(document) }; pendingAction = null }, { document -> runCatching { storage.share(document) }; pendingAction = null }, { document -> storage.delete(document); localFiles = storage.listFiles(); pendingAction = null }, { pendingAction = null })
+}
+
+@Composable internal fun LocalStorageActionConfirmation(action: LocalStorageAction?, noteTitle: String, onCreate: () -> Unit, onOpen: (LocalDocument) -> Unit, onShare: (LocalDocument) -> Unit, onDelete: (LocalDocument) -> Unit, onDismiss: () -> Unit) {
+    when (action) {
+        LocalStorageAction.CreateNote -> ConfirmDialog("Create local note?", "Create ‘${noteTitle.ifBlank { "Autonova note" }}.txt’ in the selected folder?", "Create", onCreate, onDismiss)
+        is LocalStorageAction.Open -> ConfirmDialog("Open local file?", "Open ‘${action.document.name}’ with an installed application?", "Open", { onOpen(action.document) }, onDismiss)
+        is LocalStorageAction.Share -> ConfirmDialog("Share local file?", "Share ‘${action.document.name}’ with another application?", "Share", { onShare(action.document) }, onDismiss)
+        is LocalStorageAction.Delete -> ConfirmDialog("Delete local file?", "This permanently deletes ‘${action.document.name}’ from the folder you selected.", "Delete", { onDelete(action.document) }, onDismiss)
         null -> Unit
     }
 }
