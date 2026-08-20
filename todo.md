@@ -49,7 +49,7 @@
 - [x] Replace the manual HTTPS endpoint and session-cookie gate with a usable Android first-run onboarding and authenticated connection flow.
 - [x] Rebuild the Android command center so users can discover, configure, invoke, and observe real agent capabilities without empty or disabled primary controls.
 - [x] Reconcile the Android UX and implemented device capabilities against every actionable PDF requirement, including visible permission requests and transparent execution feedback.
-- [ ] Validate the rebuilt Android APK from a fresh install and deliver a corrected functional build.
+- [x] Validate the rebuilt Android APK from a fresh install and deliver a corrected functional build.
 - [x] Add Android user-visible authentication, loading, success, and failure feedback for protected command-center actions.
 - [x] Add clear loading and failure states to the browser-based mobile sign-in flow.
 - [x] Create an auditable Android capability reconciliation with file-level evidence and an explicit implemented-versus-deferred permission audit.
