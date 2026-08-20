@@ -39,6 +39,8 @@ jobs:
       - name: Execute Android instrumentation tests
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 35
+          # API 35's device installer rejects this debug APK as a split package under AGP 8.5.2.
+          # Keep API 35 for compilation, and execute the secure-config instrumentation suite on API 34.
+          api-level: 34
           arch: x86_64
           script: cd android/Autonova && ./gradlew --no-daemon connectedDebugAndroidTest
