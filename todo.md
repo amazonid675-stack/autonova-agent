@@ -45,4 +45,4 @@
 - [x] Audit and complete Android access to all Autonova mobile workflows: chat, tasks, projects, memory, files, tools, provider status, activity, secure settings, storage, and confirmed device actions.
 - [x] Complete Android memory edit mode so saving an edited memory calls the protected update endpoint rather than creating a duplicate.
 - [x] Add Android UI coverage that exercises the Files & Storage action paths and confirms create, open, share, and delete require approval.
-- [ ] Deliver the verified Autonova debug APK attachment to the user with installation guidance.
+- [x] Deliver the verified Autonova debug APK attachment to the user with installation guidance.
