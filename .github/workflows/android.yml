@@ -43,7 +43,11 @@ jobs:
           # Keep API 35 for compilation, and execute the secure-config instrumentation suite on API 34.
           api-level: 34
           arch: x86_64
-          script: cd android/Autonova && ./gradlew --no-daemon connectedDebugAndroidTest
+          script: |
+            adb wait-for-device
+            adb shell settings put global verifier_verify_adb_installs 0
+            adb shell settings put global package_verifier_enable 0
+            cd android/Autonova && ./gradlew --no-daemon connectedDebugAndroidTest
       - name: Upload verified Android debug APK
         if: success()
         uses: actions/upload-artifact@v4
