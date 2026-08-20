@@ -64,5 +64,5 @@
 - [x] Integrate the remaining device capabilities into the mobile command center and test them on an Android emulator.
 - [x] Build, validate, and deliver a revised APK that includes the completed Android capability set.
 - [x] Make Android emulator CI install the app and test APKs explicitly, avoiding the runner's incorrect API-level detection during split-package installation.
-- [ ] Add focused emulator UI evidence for the device-capability command center, including notifications, local model, browser handoff, sharing/clipboard, and safe automation boundaries.
+- [x] Add focused emulator UI evidence for the device-capability command center, including notifications, local model, browser handoff, sharing/clipboard, and safe automation boundaries.
 - [ ] Attach the final verified APK to the user with safe installation guidance.
