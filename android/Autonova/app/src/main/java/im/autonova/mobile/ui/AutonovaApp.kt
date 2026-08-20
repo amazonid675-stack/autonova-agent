@@ -2,8 +2,10 @@ package im.autonova.mobile.ui
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.browser.customtabs.CustomTabsIntent
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
@@ -43,6 +45,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import android.net.Uri
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -68,14 +71,20 @@ internal sealed interface LocalStorageAction {
 
 @Composable fun AutonovaApp(viewModel: AutonovaViewModel = viewModel()) {
     var section by remember { mutableStateOf("Command") }
+    val feedback by viewModel.feedback.collectAsState()
     MaterialTheme(colorScheme = MaterialTheme.colorScheme.copy(background = Ink, surface = Panel, primary = Lavender, onPrimary = Ink, onBackground = Cloud, onSurface = Cloud)) {
         Scaffold(containerColor = Ink, bottomBar = { MobileNavigation(section) { section = it } }) { padding ->
-            when (section) {
-                "Command" -> CommandScreen(viewModel, Modifier.padding(padding))
-                "Tasks" -> TasksScreen(viewModel, Modifier.padding(padding))
-                "Projects" -> ProjectsScreen(viewModel, Modifier.padding(padding))
-                "Memory" -> MemoryScreen(viewModel, Modifier.padding(padding))
-                else -> MoreScreen(viewModel, Modifier.padding(padding))
+            Column(Modifier.fillMaxSize().padding(padding)) {
+                feedback?.let { FeedbackBanner(it, viewModel::clearFeedback) }
+                Box(Modifier.weight(1f).fillMaxWidth()) {
+                    when (section) {
+                        "Command" -> CommandScreen(viewModel, Modifier.fillMaxSize())
+                        "Tasks" -> TasksScreen(viewModel, Modifier.fillMaxSize())
+                        "Projects" -> ProjectsScreen(viewModel, Modifier.fillMaxSize())
+                        "Memory" -> MemoryScreen(viewModel, Modifier.fillMaxSize())
+                        else -> MoreScreen(viewModel, Modifier.fillMaxSize())
+                    }
+                }
             }
         }
     }
@@ -95,14 +104,29 @@ internal sealed interface LocalStorageAction {
     detail?.let { Text(it, color = Muted, style = MaterialTheme.typography.bodySmall) }
 }
 
+@Composable private fun FeedbackBanner(feedback: MobileFeedback, onDismiss: () -> Unit) {
+    val accent = when (feedback.tone) { FeedbackTone.ERROR -> Color(0xFFFFA7A7); FeedbackTone.SUCCESS -> Color(0xFF8FE6BE); FeedbackTone.INFO -> Lavender }
+    Card(colors = CardDefaults.cardColors(containerColor = Panel), modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
+        Row(Modifier.padding(horizontal = 14.dp, vertical = 9.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(if (feedback.isLoading) "WORKING" else "AUTONOVA", color = accent, style = MaterialTheme.typography.labelSmall)
+            Spacer(Modifier.width(10.dp)); Text(feedback.message, color = Cloud, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
+            if (!feedback.isLoading) TextButton(onClick = onDismiss) { Text("Dismiss") }
+        }
+    }
+}
+
 @Composable private fun CommandScreen(viewModel: AutonovaViewModel, modifier: Modifier) {
-    val messages by viewModel.messages.collectAsState(); val configured by viewModel.configured.collectAsState(); var draft by remember { mutableStateOf("") }
+    val messages by viewModel.messages.collectAsState(); val configured by viewModel.configured.collectAsState(); val connectionState by viewModel.connectionState.collectAsState(); val context = LocalContext.current; var draft by remember { mutableStateOf("") }
     Column(modifier.fillMaxSize().padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        PageHeader("Personal agent workspace", "Command center", if (configured) "Protected session connected. Assistant responses appear as they stream." else "Connect a protected session in More → Settings to activate the agent.")
-        AssistChip(onClick = { viewModel.refresh() }, label = { Text(if (configured) "Secure session" else "Setup required") })
+        PageHeader("Personal agent workspace", "Command center", if (configured) "Autonova is connected. Responses and task updates appear as they stream." else "Start a request now, or connect once to activate live cloud tools and long-running agent work.")
+        if (!configured) SurfaceCard {
+            Text("Connect your agent", color = Lavender, style = MaterialTheme.typography.labelSmall)
+            Text("Sign in securely in your browser. You never need to paste an endpoint or session cookie.", color = Muted, style = MaterialTheme.typography.bodySmall)
+            Button(onClick = { CustomTabsIntent.Builder().build().launchUrl(context, Uri.parse(viewModel.beginMobileSignIn())) }) { Text(if (connectionState == ConnectionState.CONNECTING) "Continue sign-in" else "Connect Autonova") }
+        } else AssistChip(onClick = { viewModel.refresh() }, label = { Text("Agent connected") })
         Card(colors = CardDefaults.cardColors(containerColor = Panel), modifier = Modifier.weight(1f).fillMaxWidth()) {
             if (messages.isEmpty()) Column(Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
-                Icon(Icons.Outlined.AutoAwesome, null, tint = Lavender); Spacer(Modifier.height(14.dp)); Text("What would you like to move forward today?"); Spacer(Modifier.height(8.dp)); Text("Ask for research, a plan, a project, a task, or analysis of an uploaded document.", color = Muted, style = MaterialTheme.typography.bodySmall)
+                Icon(Icons.Outlined.AutoAwesome, null, tint = Lavender); Spacer(Modifier.height(14.dp)); Text("What would you like to move forward today?"); Spacer(Modifier.height(8.dp)); Text("Try: “Build a website for my business”, “Research this topic”, or “Plan my project”. Autonova creates visible tasks for multi-step work.", color = Muted, style = MaterialTheme.typography.bodySmall)
             } else LazyColumn(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 items(messages, key = { it.id }) { message ->
                     Column(Modifier.fillMaxWidth()) { Text(if (message.role == "user") "YOU" else "AUTONOVA", color = if (message.role == "user") Lavender else Muted, style = MaterialTheme.typography.labelSmall); Text(message.content, color = if (message.role == "user") Lavender else Cloud, modifier = Modifier.padding(top = 3.dp)) }
@@ -151,7 +175,7 @@ internal sealed interface LocalStorageAction {
 
 @Composable private fun MoreScreen(viewModel: AutonovaViewModel, modifier: Modifier) {
     var selected by remember { mutableStateOf<String?>(null) }
-    val options = listOf("Files & Storage" to "Secure cloud files and a folder you choose on this device.", "Tools" to "Permissioned capabilities with Ask, Allow, and Deny.", "Image Studio" to "Generate images through the protected Autonova image service.", "GitHub" to "Inspect public repositories, branches, issues, pull requests, and commits.", "Usage" to "Review token, tool, and cost totals for your account.", "Settings" to "Encrypted endpoint, session, and provider configuration.", "Activity" to "Visible agent action summaries and device events.")
+    val options = listOf("Files & Storage" to "Secure cloud files and a folder you choose on this device.", "Tools" to "Permissioned capabilities with Ask, Allow, and Deny.", "Image Studio" to "Generate images through the protected Autonova image service.", "GitHub" to "Inspect public repositories, branches, issues, pull requests, and commits.", "Usage" to "Review token, tool, and cost totals for your account.", "Settings" to "Browser sign-in, encrypted local credentials, and provider configuration.", "Activity" to "Visible agent action summaries and device events.")
     Column(modifier.fillMaxSize().padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         PageHeader("Control plane", selected ?: "More", if (selected == null) "Every action remains visible and under your control." else null)
         if (selected == null) options.forEach { (title, detail) -> SurfaceCard(Modifier.clickable { selected = title }) { Text(title, fontWeight = FontWeight.SemiBold); Text(detail, color = Muted, style = MaterialTheme.typography.bodySmall) } } else {
@@ -226,13 +250,11 @@ internal sealed interface LocalStorageAction {
 }
 
 @Composable private fun SettingsScreen(viewModel: AutonovaViewModel) {
-    val configured by viewModel.configured.collectAsState(); val provider by viewModel.provider.collectAsState(); var endpoint by remember { mutableStateOf("") }; var cookie by remember { mutableStateOf("") }; var error by remember { mutableStateOf<String?>(null) }; var providerName by remember { mutableStateOf(provider?.name ?: "Autonova built-in") }; var providerType by remember { mutableStateOf(provider?.type ?: "BUILT_IN") }; var providerUrl by remember { mutableStateOf("") }; var providerModel by remember { mutableStateOf(provider?.model ?: "") }; var providerKey by remember { mutableStateOf("") }; var costMode by remember { mutableStateOf(provider?.costMode ?: "BALANCED") }
-    Text("Secure connection", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold); Text("The endpoint and session cookie are encrypted on this device. Only an HTTPS Autonova endpoint is accepted.", color = Muted, style = MaterialTheme.typography.bodySmall)
-    OutlinedTextField(value = endpoint, onValueChange = { endpoint = it }, modifier = Modifier.fillMaxWidth(), label = { Text("Autonova HTTPS endpoint") }, singleLine = true)
-    OutlinedTextField(value = cookie, onValueChange = { cookie = it }, modifier = Modifier.fillMaxWidth(), label = { Text("Session cookie (session=…)" ) }, singleLine = true)
-    Button(onClick = { if (viewModel.saveConnection(endpoint, cookie)) error = null else error = "Use a public HTTPS endpoint and a session= cookie." }, enabled = endpoint.isNotBlank() && cookie.isNotBlank()) { Text("Save secure connection") }
+    val configured by viewModel.configured.collectAsState(); val provider by viewModel.provider.collectAsState(); val connectionState by viewModel.connectionState.collectAsState(); val context = LocalContext.current; var providerName by remember { mutableStateOf(provider?.name ?: "Autonova built-in") }; var providerType by remember { mutableStateOf(provider?.type ?: "BUILT_IN") }; var providerUrl by remember { mutableStateOf("") }; var providerModel by remember { mutableStateOf(provider?.model ?: "") }; var providerKey by remember { mutableStateOf("") }; var costMode by remember { mutableStateOf(provider?.costMode ?: "BALANCED") }
+    Text("Agent connection", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold); Text("Autonova uses secure browser sign-in and encrypted Android Keystore storage. No API key, endpoint, or session cookie needs to be copied into the app.", color = Muted, style = MaterialTheme.typography.bodySmall)
+    if (!configured) Button(onClick = { CustomTabsIntent.Builder().build().launchUrl(context, Uri.parse(viewModel.beginMobileSignIn())) }) { Text(if (connectionState == ConnectionState.CONNECTING) "Continue sign-in" else "Connect Autonova") }
     if (configured) { Text("Connected", color = Lavender); Text("Provider configuration", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold); OutlinedTextField(value = providerName, onValueChange = { providerName = it }, modifier = Modifier.fillMaxWidth(), label = { Text("Provider name") }); Row { listOf("BUILT_IN", "OPENAI_COMPATIBLE").forEach { type -> AssistChip(onClick = { providerType = type }, label = { Text(if (providerType == type) "✓ $type" else type) }) } }; if (providerType == "OPENAI_COMPATIBLE") { OutlinedTextField(value = providerUrl, onValueChange = { providerUrl = it }, modifier = Modifier.fillMaxWidth(), label = { Text("Provider HTTPS endpoint") }); OutlinedTextField(value = providerModel, onValueChange = { providerModel = it }, modifier = Modifier.fillMaxWidth(), label = { Text("Model") }); OutlinedTextField(value = providerKey, onValueChange = { providerKey = it }, modifier = Modifier.fillMaxWidth(), label = { Text("API key") }) }; Row { listOf("LOCAL_ONLY", "BALANCED", "POWER").forEach { mode -> AssistChip(onClick = { costMode = mode }, label = { Text(if (costMode == mode) "✓ ${mode.lowercase()}" else mode.lowercase()) }) } }; Button(onClick = { viewModel.saveProvider(providerName, providerType, providerUrl, providerModel, providerKey, costMode) }, enabled = providerName.isNotBlank()) { Text("Save provider") } }
-    error?.let { Text(it, color = Color(0xFFFFA7A7)) }; provider?.let { SurfaceCard { Text("Active provider", color = Lavender, style = MaterialTheme.typography.labelSmall); Text("${it.name} · ${it.costMode}"); Text("Model: ${it.model ?: "automatic"}", color = Muted, style = MaterialTheme.typography.bodySmall) } }
+    provider?.let { SurfaceCard { Text("Active provider", color = Lavender, style = MaterialTheme.typography.labelSmall); Text("${it.name} · ${it.costMode}"); Text("Model: ${it.model ?: "automatic"}", color = Muted, style = MaterialTheme.typography.bodySmall) } }
     if (configured) TextButton(onClick = { viewModel.clearConnection() }) { Text("Clear local session") }
 }
 

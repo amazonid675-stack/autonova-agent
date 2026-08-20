@@ -22,7 +22,7 @@ class AgentRepository(private val cache: AgentCacheDao, private val config: Secu
     init { scope.launch { cache.observeTasks().collect { cached -> _tasks.value = cached.map { AgentTask(it.id, it.request, TaskStatus.valueOf(it.status), it.updatedAt) } } }; scope.launch { cache.observeMessages().collect { cached -> _messages.value = cached.map { ChatMessage(it.id, it.role, it.content, it.createdAt) } } }; scope.launch { cache.observeProjects().collect { cached -> _projects.value = cached.map { AgentProject(it.id, it.name, it.description) } } }; scope.launch { cache.observeMemories().collect { cached -> _memories.value = cached.map { MemoryItem(it.id, it.title, it.content, it.layer) } } }; scope.launch { cache.observeActivity().collect { cached -> _activity.value = cached.map { ActivityItem(it.id, it.title, it.detail, it.eventType) } } } }
     fun createLocalTask(request: String) { val now = System.currentTimeMillis(); scope.launch { cache.upsertTasks(listOf(CachedTask("local-$now", request, TaskStatus.PLANNING.name, now))) } }
     fun appendLocalMessage(message: ChatMessage) { scope.launch { cache.upsertMessage(CachedMessage(message.id, message.role, message.content, message.createdAt)) } }
-    private fun api(): MobileAgentApi? { val endpoint = config.apiBaseUrl(); val cookie = config.sessionCookie(); return if (endpoint != null && cookie != null) MobileAgentApi(endpoint, cookie) else null }
+    private fun api(): MobileAgentApi? = config.accessToken()?.let { MobileAgentApi(config.apiBaseUrl(), it) }
     suspend fun refresh(): Boolean {
         val api = api() ?: return false
         api.registerDevice(DeviceRegistration(config.deviceId(), "Android ${Build.MODEL}", false))
@@ -31,10 +31,12 @@ class AgentRepository(private val cache: AgentCacheDao, private val config: Secu
         _files.value = snapshot.files.map { FileItem(it.id.toString(), it.name, it.mimeType, it.sizeBytes) }; _tools.value = snapshot.toolPermissions.map { ToolItem(it.toolKey, it.policy) }; _provider.value = snapshot.provider?.let { ProviderItem(it.name, it.providerType, it.activeModel, it.costMode, it.hasApiKey) }
         return true
     }
-    suspend fun submit(text: String) {
+    suspend fun submit(text: String): Boolean {
         val now = System.currentTimeMillis(); appendLocalMessage(ChatMessage("local-$now", "user", text, now)); val api = api()
-        if (api != null) { val assistantId = "agent-${System.currentTimeMillis()}"; val assistantCreatedAt = System.currentTimeMillis(); var receivedSnapshot = false; val reply = runCatching { api.sendMessage(text) { snapshot -> if (snapshot.isNotBlank()) { receivedSnapshot = true; cache.upsertMessage(CachedMessage(assistantId, "assistant", snapshot, assistantCreatedAt)) } } }.getOrNull(); if (!receivedSnapshot && !reply.isNullOrBlank()) cache.upsertMessage(CachedMessage(assistantId, "assistant", reply, assistantCreatedAt)) }
-        if (text.lowercase().startsWith("build") || text.lowercase().startsWith("create")) createLocalTask(text)
+        if (api != null) { val assistantId = "agent-${System.currentTimeMillis()}"; val assistantCreatedAt = System.currentTimeMillis(); var receivedSnapshot = false; val result = runCatching { api.sendMessage(text) { snapshot -> if (snapshot.isNotBlank()) { receivedSnapshot = true; cache.upsertMessage(CachedMessage(assistantId, "assistant", snapshot, assistantCreatedAt)) } } }; if (result.isFailure) return false; val reply = result.getOrNull(); if (!receivedSnapshot && !reply.isNullOrBlank()) cache.upsertMessage(CachedMessage(assistantId, "assistant", reply, assistantCreatedAt)) }
+        else appendLocalMessage(ChatMessage("local-agent-${System.currentTimeMillis()}", "assistant", "I saved this as a local agent request. Connect your Autonova account to execute cloud research, GitHub, files, image generation, and multi-step verification. You can still review the task plan in Tasks.", System.currentTimeMillis()))
+        if (text.lowercase().startsWith("build") || text.lowercase().startsWith("create") || text.lowercase().startsWith("research") || text.lowercase().startsWith("plan")) createLocalTask(text)
+        return true
     }
     suspend fun createProject(name: String, description: String): Boolean = runCatching { api()?.createProject(name, description) ?: error("Connect the secure session first."); refresh() }.isSuccess
     suspend fun createTask(request: String): Boolean = runCatching { api()?.createTask(request) ?: error("Connect the secure session first."); refresh() }.isSuccess

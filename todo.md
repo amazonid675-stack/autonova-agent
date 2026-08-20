@@ -46,3 +46,10 @@
 - [x] Complete Android memory edit mode so saving an edited memory calls the protected update endpoint rather than creating a duplicate.
 - [x] Add Android UI coverage that exercises the Files & Storage action paths and confirms create, open, share, and delete require approval.
 - [x] Deliver the verified Autonova debug APK attachment to the user with installation guidance.
+- [x] Replace the manual HTTPS endpoint and session-cookie gate with a usable Android first-run onboarding and authenticated connection flow.
+- [x] Rebuild the Android command center so users can discover, configure, invoke, and observe real agent capabilities without empty or disabled primary controls.
+- [x] Reconcile the Android UX and implemented device capabilities against every actionable PDF requirement, including visible permission requests and transparent execution feedback.
+- [ ] Validate the rebuilt Android APK from a fresh install and deliver a corrected functional build.
+- [x] Add Android user-visible authentication, loading, success, and failure feedback for protected command-center actions.
+- [x] Add clear loading and failure states to the browser-based mobile sign-in flow.
+- [x] Create an auditable Android capability reconciliation with file-level evidence and an explicit implemented-versus-deferred permission audit.

@@ -163,6 +163,19 @@ export const mobileDevices = mysqlTable("mobileDevices", {
   userDeviceUnique: uniqueIndex("mobile_devices_user_device_unique").on(table.userId, table.deviceId),
 }));
 
+export const mobileAuthGrants = mysqlTable("mobileAuthGrants", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
+  codeHash: varchar("codeHash", { length: 64 }).notNull(),
+  verifierHash: varchar("verifierHash", { length: 64 }).notNull(),
+  encryptedSessionToken: text("encryptedSessionToken").notNull(),
+  expiresAt: timestamp("expiresAt").notNull(),
+  consumedAt: timestamp("consumedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, table => ({
+  codeHashUnique: uniqueIndex("mobile_auth_grants_code_hash_unique").on(table.codeHash),
+}));
+
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 export type Project = typeof projects.$inferSelect;

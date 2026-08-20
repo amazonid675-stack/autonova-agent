@@ -1,4 +1,4 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, gt, isNull } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import {
   activityEvents,
@@ -7,6 +7,7 @@ import {
   InsertUser,
   memories,
   messages,
+  mobileAuthGrants,
   mobileDevices,
   projects,
   providerConfigs,
@@ -53,6 +54,25 @@ export async function getUserByOpenId(openId: string) {
   if (!db) return undefined;
   const result = await db.select().from(users).where(eq(users.openId, openId)).limit(1);
   return result[0];
+}
+
+export async function createMobileAuthGrant(input: { userId: number; codeHash: string; verifierHash: string; encryptedSessionToken: string; expiresAt: Date }) {
+  const db = await getDb();
+  if (!db) return null;
+  await db.insert(mobileAuthGrants).values(input);
+  const rows = await db.select().from(mobileAuthGrants).where(eq(mobileAuthGrants.codeHash, input.codeHash)).limit(1);
+  return rows[0] ?? null;
+}
+
+export async function consumeMobileAuthGrant(codeHash: string, verifierHash: string) {
+  const db = await getDb();
+  if (!db) return null;
+  const rows = await db.select().from(mobileAuthGrants).where(eq(mobileAuthGrants.codeHash, codeHash)).limit(1);
+  const grant = rows[0];
+  if (!grant || grant.verifierHash !== verifierHash || grant.expiresAt <= new Date() || grant.consumedAt) return null;
+  const result = await db.update(mobileAuthGrants).set({ consumedAt: new Date() }).where(and(eq(mobileAuthGrants.id, grant.id), isNull(mobileAuthGrants.consumedAt), gt(mobileAuthGrants.expiresAt, new Date())));
+  if ((result as unknown as [{ affectedRows?: number }])[0]?.affectedRows !== 1) return null;
+  return grant;
 }
 
 export async function listProjects(userId: number) {

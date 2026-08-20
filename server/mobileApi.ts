@@ -1,10 +1,13 @@
+import crypto from "crypto";
 import type { Express } from "express";
 import { z } from "zod";
 import { createContext } from "./_core/context";
 import * as db from "./db";
 import { storagePut } from "./storage";
 import { generateImage } from "./_core/imageGeneration";
-import { encryptSecret } from "./security";
+import { decryptSecret, encryptSecret } from "./security";
+import { encodeOAuthState, OAUTH_STATE_COOKIE } from "../shared/const";
+import { ENV } from "./_core/env";
 
 const deviceSchema = z.object({ deviceId: z.string().min(12).max(128), label: z.string().min(1).max(160), pushEnabled: z.boolean().default(false) });
 const projectSchema = z.object({ name: z.string().trim().min(1).max(120), description: z.string().trim().max(2000).optional() });
@@ -16,6 +19,8 @@ const taskActionSchema = z.object({ status: z.enum(["QUEUED", "CANCELLED"]) });
 const providerSchema = z.object({ name: z.string().trim().min(1).max(120), providerType: z.enum(["BUILT_IN", "OPENAI_COMPATIBLE"]), baseUrl: z.string().trim().max(500).optional(), activeModel: z.string().trim().max(160).optional(), apiKey: z.string().trim().min(8).max(4000).optional(), costMode: z.enum(["LOCAL_ONLY", "BALANCED", "POWER"]) });
 const imageSchema = z.object({ prompt: z.string().trim().min(3).max(1200) });
 const githubRepositorySchema = z.string().trim().regex(/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/);
+const mobileLoginSchema = z.object({ serverOrigin: z.string().url(), codeChallenge: z.string().regex(/^[a-f0-9]{64}$/i) });
+const mobileExchangeSchema = z.object({ code: z.string().min(32).max(128), codeVerifier: z.string().min(32).max(256) });
 type RequestContext = Awaited<ReturnType<typeof createContext>>;
 type AuthenticatedMobileContext = RequestContext & { user: NonNullable<RequestContext["user"]> };
 
@@ -29,7 +34,38 @@ function mobileError(res: Parameters<typeof createContext>[0]["res"], error: unk
   return res.status(400).json({ error: message });
 }
 
+function requestOrigin(req: { protocol: string; get(name: string): string | undefined; headers: Record<string, unknown> }) {
+  const forwarded = req.headers["x-forwarded-proto"];
+  const protocol = typeof forwarded === "string" ? forwarded.split(",")[0].trim() : req.protocol;
+  return `${protocol}://${req.get("host")}`;
+}
+
 export function registerMobileApi(app: Express) {
+  app.get("/api/mobile/auth/start", async (req, res) => {
+    const parsed = mobileLoginSchema.safeParse(req.query);
+    if (!parsed.success || !ENV.oAuthPortalUrl || !ENV.appId) return res.status(400).json({ error: "Mobile sign-in is unavailable." });
+    if (new URL(parsed.data.serverOrigin).origin !== requestOrigin(req)) return res.status(400).json({ error: "The mobile server origin must match this Autonova workspace." });
+    const nonce = crypto.randomUUID();
+    const callbackUrl = `${new URL(parsed.data.serverOrigin).origin}/api/oauth/callback`;
+    const state = encodeOAuthState({ redirectUri: callbackUrl, nonce, mobileVerifierHash: parsed.data.codeChallenge });
+    res.cookie(OAUTH_STATE_COOKIE, nonce, { httpOnly: true, secure: true, sameSite: "none", path: "/", maxAge: 10 * 60 * 1000 });
+    const loginUrl = new URL("app-auth", `${ENV.oAuthPortalUrl.replace(/\/$/, "")}/`);
+    loginUrl.searchParams.set("appId", ENV.appId);
+    loginUrl.searchParams.set("redirectUri", callbackUrl);
+    loginUrl.searchParams.set("state", state);
+    loginUrl.searchParams.set("type", "signIn");
+    return res.redirect(302, loginUrl.toString());
+  });
+  app.post("/api/mobile/auth/exchange", async (req, res) => {
+    const parsed = mobileExchangeSchema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: "Invalid mobile sign-in exchange." });
+    const grant = await db.consumeMobileAuthGrant(
+      crypto.createHash("sha256").update(parsed.data.code).digest("hex"),
+      crypto.createHash("sha256").update(parsed.data.codeVerifier).digest("hex"),
+    );
+    if (!grant) return res.status(401).json({ error: "This mobile sign-in link has expired or was already used." });
+    return res.json({ accessToken: decryptSecret(grant.encryptedSessionToken) });
+  });
   app.get("/api/mobile/bootstrap", async (req, res) => {
     const ctx = await requireMobileUser(req, res);
     if (!ctx) return res.status(401).json({ error: "Authentication required" });
