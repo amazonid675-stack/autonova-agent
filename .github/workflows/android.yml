@@ -35,20 +35,24 @@ jobs:
       - name: Generate temporary Gradle wrapper
         run: gradle wrapper --gradle-version 8.10.2
       - name: Run Android unit tests and compile instrumentation tests
-        run: ./gradlew --no-daemon :app:testDebugUnitTest :app:assembleDebugAndroidTest
+        run: ./gradlew --no-daemon :app:testDebugUnitTest :app:assembleDebug :app:assembleDebugAndroidTest
       - name: Execute Android instrumentation tests
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          # API 35's device installer rejects this debug APK as a split package under AGP 8.5.2.
-          # Keep API 35 for compilation, and execute the secure-config instrumentation suite on API 34.
+          # Keep API 35 for compilation, and run the instrumentation suite on API 34.
+          # AGP 8.5.2 can misread the emulator as API 1 when it installs a split package.
+          # Explicit ADB installation avoids that runner/AGP integration defect.
           api-level: 34
           arch: x86_64
           script: |
             adb wait-for-device
+            until [ "$(adb shell getprop sys.boot_completed | tr -d '\r')" = "1" ]; do sleep 2; done
+            adb shell getprop ro.build.version.sdk
             adb shell settings put global verifier_verify_adb_installs 0 || true
             adb shell settings put global package_verifier_enable 0 || true
-            sleep 5
-            cd android/Autonova && ./gradlew --no-daemon connectedDebugAndroidTest
+            adb install -r app/build/outputs/apk/debug/app-debug.apk
+            adb install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+            adb shell am instrument -w -r -e clearPackageData true im.autonova.mobile.test/androidx.test.runner.AndroidJUnitRunner
       - name: Upload verified Android debug APK
         if: success()
         uses: actions/upload-artifact@v4

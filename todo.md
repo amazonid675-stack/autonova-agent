@@ -63,3 +63,4 @@
 - [ ] Add documented, user-confirmed automation boundaries for browser, clipboard, and background execution.
 - [ ] Integrate the remaining device capabilities into the mobile command center and test them on an Android emulator.
 - [ ] Build, validate, and deliver a revised APK that includes the completed Android capability set.
+- [ ] Make Android emulator CI install the app and test APKs explicitly, avoiding the runner's incorrect API-level detection during split-package installation.
