@@ -38,3 +38,7 @@
 - [x] Surface cached projects and implement a durable, user-approved queued mobile action foundation with WorkManager.
 - [x] Extend Android SecureConfig tests to assert unsafe endpoint and invalid session-cookie rejection, then rerun GitHub Actions.
 - [x] Run Android instrumentation tests on an emulator in GitHub Actions so secure configuration rejection behavior is executed and verified.
+- [ ] Add Android scoped-storage access through a user-selected folder, persist the granted URI safely, and surface selected files in the app.
+- [ ] Add explicit-confirmation device actions for creating, sharing, opening, and deleting files in the user-selected folder.
+- [ ] Build and attach an installable Android debug APK containing the verified device-capability update.
+- [ ] Audit and complete Android access to all Autonova mobile workflows: chat, tasks, projects, memory, files, tools, provider status, activity, secure settings, storage, and confirmed device actions.

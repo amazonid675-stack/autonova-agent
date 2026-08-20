@@ -1,6 +1,7 @@
 package im.autonova.mobile.data
 
 import android.os.Build
+import android.util.Base64
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -10,7 +11,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 
-/** Keep OAuth/session exchange and protected backend calls out of Compose UI. */
+/** Keeps protected backend access, encrypted configuration, and Room cache updates out of Compose UI. */
 class AgentRepository(private val cache: AgentCacheDao, private val config: SecureConfig) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val _messages = MutableStateFlow<List<ChatMessage>>(emptyList()); private val _tasks = MutableStateFlow<List<AgentTask>>(emptyList()); private val _projects = MutableStateFlow<List<AgentProject>>(emptyList())
@@ -20,41 +21,27 @@ class AgentRepository(private val cache: AgentCacheDao, private val config: Secu
     init { scope.launch { cache.observeTasks().collect { cached -> _tasks.value = cached.map { AgentTask(it.id, it.request, TaskStatus.valueOf(it.status), it.updatedAt) } } }; scope.launch { cache.observeMessages().collect { cached -> _messages.value = cached.map { ChatMessage(it.id, it.role, it.content, it.createdAt) } } }; scope.launch { cache.observeProjects().collect { cached -> _projects.value = cached.map { AgentProject(it.id, it.name, it.description) } } }; scope.launch { cache.observeMemories().collect { cached -> _memories.value = cached.map { MemoryItem(it.id, it.title, it.content, it.layer) } } }; scope.launch { cache.observeActivity().collect { cached -> _activity.value = cached.map { ActivityItem(it.id, it.title, it.detail, it.eventType) } } } }
     fun createLocalTask(request: String) { val now = System.currentTimeMillis(); scope.launch { cache.upsertTasks(listOf(CachedTask("local-$now", request, TaskStatus.PLANNING.name, now))) } }
     fun appendLocalMessage(message: ChatMessage) { scope.launch { cache.upsertMessage(CachedMessage(message.id, message.role, message.content, message.createdAt)) } }
+    private fun api(): MobileAgentApi? { val endpoint = config.apiBaseUrl(); val cookie = config.sessionCookie(); return if (endpoint != null && cookie != null) MobileAgentApi(endpoint, cookie) else null }
     suspend fun refresh(): Boolean {
-        val endpoint = config.apiBaseUrl() ?: return false; val cookie = config.sessionCookie() ?: return false
-        val api = MobileAgentApi(endpoint, cookie)
+        val api = api() ?: return false
         api.registerDevice(DeviceRegistration(config.deviceId(), "Android ${Build.MODEL}", false))
         val snapshot = api.bootstrap()
-        cache.upsertProjects(snapshot.projects.map { CachedProject(it.id.toString(), it.name, it.description ?: "") })
-        cache.upsertTasks(snapshot.tasks.map { CachedTask(it.id.toString(), it.request, it.status, System.currentTimeMillis()) })
-        cache.upsertMemories(snapshot.memories.map { CachedMemory(it.id.toString(), it.title, it.content, it.layer) })
-        cache.upsertActivity(snapshot.activity.map { CachedActivity(it.id.toString(), it.title, it.detail ?: "", it.eventType) })
-        _files.value = snapshot.files.map { FileItem(it.id.toString(), it.name, it.mimeType, it.sizeBytes) }
-        _tools.value = snapshot.toolPermissions.map { ToolItem(it.toolKey, it.policy) }
-        _provider.value = snapshot.provider?.let { ProviderItem(it.name, it.providerType, it.activeModel, it.costMode, it.hasApiKey) }
+        cache.upsertProjects(snapshot.projects.map { CachedProject(it.id.toString(), it.name, it.description ?: "") }); cache.upsertTasks(snapshot.tasks.map { CachedTask(it.id.toString(), it.request, it.status, System.currentTimeMillis()) }); cache.upsertMemories(snapshot.memories.map { CachedMemory(it.id.toString(), it.title, it.content, it.layer) }); cache.upsertActivity(snapshot.activity.map { CachedActivity(it.id.toString(), it.title, it.detail ?: "", it.eventType) })
+        _files.value = snapshot.files.map { FileItem(it.id.toString(), it.name, it.mimeType, it.sizeBytes) }; _tools.value = snapshot.toolPermissions.map { ToolItem(it.toolKey, it.policy) }; _provider.value = snapshot.provider?.let { ProviderItem(it.name, it.providerType, it.activeModel, it.costMode, it.hasApiKey) }
         return true
     }
     suspend fun submit(text: String) {
-        val now = System.currentTimeMillis(); val user = ChatMessage("local-$now", "user", text, now); appendLocalMessage(user)
-        val endpoint = config.apiBaseUrl(); val cookie = config.sessionCookie()
-        if (endpoint != null && cookie != null) {
-            val assistantId = "agent-${System.currentTimeMillis()}"
-            val assistantCreatedAt = System.currentTimeMillis()
-            var receivedSnapshot = false
-            val reply = runCatching {
-                MobileAgentApi(endpoint, cookie).sendMessage(text) { snapshot ->
-                    if (snapshot.isNotBlank()) {
-                        receivedSnapshot = true
-                        cache.upsertMessage(CachedMessage(assistantId, "assistant", snapshot, assistantCreatedAt))
-                    }
-                }
-            }.getOrNull()
-            if (!receivedSnapshot && !reply.isNullOrBlank()) {
-                cache.upsertMessage(CachedMessage(assistantId, "assistant", reply, assistantCreatedAt))
-            }
-        }
+        val now = System.currentTimeMillis(); appendLocalMessage(ChatMessage("local-$now", "user", text, now)); val api = api()
+        if (api != null) { val assistantId = "agent-${System.currentTimeMillis()}"; val assistantCreatedAt = System.currentTimeMillis(); var receivedSnapshot = false; val reply = runCatching { api.sendMessage(text) { snapshot -> if (snapshot.isNotBlank()) { receivedSnapshot = true; cache.upsertMessage(CachedMessage(assistantId, "assistant", snapshot, assistantCreatedAt)) } } }.getOrNull(); if (!receivedSnapshot && !reply.isNullOrBlank()) cache.upsertMessage(CachedMessage(assistantId, "assistant", reply, assistantCreatedAt)) }
         if (text.lowercase().startsWith("build") || text.lowercase().startsWith("create")) createLocalTask(text)
     }
+    suspend fun createProject(name: String, description: String): Boolean = runCatching { api()?.createProject(name, description) ?: error("Connect the secure session first."); refresh() }.isSuccess
+    suspend fun createTask(request: String): Boolean = runCatching { api()?.createTask(request) ?: error("Connect the secure session first."); refresh() }.isSuccess
+    suspend fun createMemory(title: String, content: String, layer: String): Boolean = runCatching { api()?.createMemory(title, content, layer) ?: error("Connect the secure session first."); refresh() }.isSuccess
+    suspend fun updateMemory(id: String, title: String, content: String, layer: String): Boolean = runCatching { api()?.updateMemory(id, title, content, layer) ?: error("Connect the secure session first."); refresh() }.isSuccess
+    suspend fun deleteMemory(id: String): Boolean = runCatching { api()?.deleteMemory(id) ?: error("Connect the secure session first."); refresh() }.isSuccess
+    suspend fun setToolPolicy(key: String, policy: String): Boolean = runCatching { api()?.setToolPolicy(key, policy) ?: error("Connect the secure session first."); refresh() }.isSuccess
+    suspend fun uploadFile(document: LocalDocument, bytes: ByteArray): Boolean = runCatching { require(bytes.size <= 10 * 1024 * 1024) { "Files must be 10 MB or smaller." }; api()?.uploadFile(document.name, document.mimeType, Base64.encodeToString(bytes, Base64.NO_WRAP)) ?: error("Connect the secure session first."); refresh() }.isSuccess
 }
 
 data class MemoryItem(val id: String, val title: String, val content: String, val layer: String)

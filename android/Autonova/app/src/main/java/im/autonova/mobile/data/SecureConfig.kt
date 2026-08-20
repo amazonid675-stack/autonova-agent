@@ -12,6 +12,9 @@ class SecureConfig(context: Context) {
     fun saveSessionCookie(value: String) { require(value.startsWith("session=")) { "Only the session cookie is stored." }; prefs.edit().putString("session_cookie", value).apply() }
     fun sessionCookie(): String? = prefs.getString("session_cookie", null)
     fun deviceId(): String = prefs.getString("device_id", null) ?: UUID.randomUUID().toString().also { prefs.edit().putString("device_id", it).apply() }
+    fun saveStorageTree(value: String) { require(value.startsWith("content://")) { "Only Android document-provider folders are permitted." }; prefs.edit().putString("storage_tree", value).apply() }
+    fun storageTree(): String? = prefs.getString("storage_tree", null)
+    fun clearStorageTree() = prefs.edit().remove("storage_tree").apply()
     fun isConfigured(): Boolean = apiBaseUrl() != null && sessionCookie() != null
     fun clearSession() = prefs.edit().clear().apply()
 }
