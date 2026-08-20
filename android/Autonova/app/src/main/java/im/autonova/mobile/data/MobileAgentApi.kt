@@ -72,10 +72,12 @@ internal fun decodeStreamEvent(data: String): MobileStreamEvent? {
     }
 }
 
+internal fun bearerAuthorizationValue(accessToken: String): String = "Bearer $accessToken"
+
 class MobileAgentApi(private val baseUrl: String, private val accessToken: String) {
     private val client = HttpClient(OkHttp) { install(ContentNegotiation) { json(Json { ignoreUnknownKeys = true }) } }
     private fun path(value: String) = "${baseUrl.trimEnd('/')}$value"
-    private fun authorized() = Pair(HttpHeaders.Authorization, "Bearer $accessToken")
+    private fun authorized() = Pair(HttpHeaders.Authorization, bearerAuthorizationValue(accessToken))
     private suspend fun requireSuccess(response: HttpResponse) { if (response.status.value !in 200..299) throw IllegalStateException(response.bodyAsText().take(300).ifBlank { "Mobile request failed (${response.status.value})." }) }
 
     suspend fun bootstrap(): MobileBootstrap = client.get(path("/api/mobile/bootstrap")) { header(authorized().first, authorized().second) }.body()

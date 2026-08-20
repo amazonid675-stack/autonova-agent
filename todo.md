@@ -54,3 +54,4 @@
 - [x] Add clear loading and failure states to the browser-based mobile sign-in flow.
 - [x] Create an auditable Android capability reconciliation with file-level evidence and an explicit implemented-versus-deferred permission audit.
 - [x] Add fresh-launch Android UI coverage for the browser sign-in entry point and command-center readiness.
+- [x] Add focused Android deep-link and bearer-auth transport regression coverage plus first-launch release validation evidence.
