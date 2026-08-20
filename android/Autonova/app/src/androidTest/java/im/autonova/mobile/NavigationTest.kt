@@ -14,6 +14,6 @@ class NavigationTest {
 
     @Test fun bottom_navigation_opens_task_surface() {
         compose.onNodeWithText("Tasks").performClick()
-        compose.onNodeWithText("Plan → execute → observe → verify. The server remains the source of truth once synchronized.").assertIsDisplayed()
+        compose.onNodeWithText("Create protected tasks, then observe planning, execution, verification, and completion from the same workspace.").assertIsDisplayed()
     }
 }
