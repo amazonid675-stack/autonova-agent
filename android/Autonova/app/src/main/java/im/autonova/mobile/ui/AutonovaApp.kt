@@ -1,5 +1,9 @@
 package im.autonova.mobile.ui
 
+import android.Manifest
+import android.content.ClipDescription
+import android.content.Context
+import android.graphics.Bitmap
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.browser.customtabs.CustomTabsIntent
@@ -37,6 +41,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -56,6 +61,9 @@ import im.autonova.mobile.data.LocalDocument
 import im.autonova.mobile.data.MemoryItem
 import im.autonova.mobile.data.SecureConfig
 import im.autonova.mobile.data.ToolItem
+import im.autonova.mobile.data.VoiceAssistant
+import im.autonova.mobile.data.ScreenshotCapture
+import java.io.ByteArrayOutputStream
 
 private val Ink = Color(0xFF0B0B15)
 private val Panel = Color(0xFF151521)
@@ -116,7 +124,15 @@ internal sealed interface LocalStorageAction {
 }
 
 @Composable private fun CommandScreen(viewModel: AutonovaViewModel, modifier: Modifier) {
-    val messages by viewModel.messages.collectAsState(); val configured by viewModel.configured.collectAsState(); val connectionState by viewModel.connectionState.collectAsState(); val context = LocalContext.current; var draft by remember { mutableStateOf("") }
+    val messages by viewModel.messages.collectAsState(); val configured by viewModel.configured.collectAsState(); val connectionState by viewModel.connectionState.collectAsState(); val context = LocalContext.current; var draft by remember { mutableStateOf("") }; var confirmClipboard by remember { mutableStateOf<String?>(null) }
+    val voice = remember(context) { VoiceAssistant(context) }
+    val screenshotCapture = remember(context) { ScreenshotCapture(context) }
+    DisposableEffect(voice) { onDispose { voice.close() } }
+    val microphonePermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted -> if (granted) voice.listen({ draft = it }, { draft = it; viewModel.submit(it) }, { viewModel.showError(it) }) else viewModel.showError("Microphone permission is required for voice input.") }
+    val camera = rememberLauncherForActivityResult(ActivityResultContracts.TakePicturePreview()) { bitmap -> bitmap?.let { uploadCameraBitmap(it, viewModel) } }
+    val cameraPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted -> if (granted) camera.launch(null) else viewModel.showError("Camera permission is required before taking a picture.") }
+    val photoPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri -> uri?.let { uploadSelectedVisual(context, it, "image", viewModel) } }
+    val screenshotConsent = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result -> screenshotCapture.capture(result.resultCode, result.data) { bytes -> bytes.onSuccess { viewModel.uploadDeviceContext("screenshot-${System.currentTimeMillis()}.jpg", "image/jpeg", it) }.onFailure { viewModel.showError(it.message ?: "Screenshot capture failed.") } } }
     Column(modifier.fillMaxSize().padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         PageHeader("Personal agent workspace", "Command center", if (configured) "Autonova is connected. Responses and task updates appear as they stream." else "Start a request now, or connect once to activate live cloud tools and long-running agent work.")
         if (!configured) SurfaceCard {
@@ -124,6 +140,11 @@ internal sealed interface LocalStorageAction {
             Text("Sign in securely in your browser. You never need to paste an endpoint or session cookie.", color = Muted, style = MaterialTheme.typography.bodySmall)
             Button(onClick = { CustomTabsIntent.Builder().build().launchUrl(context, Uri.parse(viewModel.beginMobileSignIn())) }) { Text(if (connectionState == ConnectionState.CONNECTING) "Continue sign-in" else "Connect Autonova") }
         } else AssistChip(onClick = { viewModel.refresh() }, label = { Text("Agent connected") })
+        SurfaceCard {
+            Text("Device inputs", color = Lavender, style = MaterialTheme.typography.labelSmall)
+            Text("Voice, camera, screenshots, files, shared items, URLs, and clipboard content become agent context only after you choose an action.", color = Muted, style = MaterialTheme.typography.bodySmall)
+            Row { TextButton(onClick = { microphonePermission.launch(Manifest.permission.RECORD_AUDIO) }) { Text("Voice") }; TextButton(onClick = { cameraPermission.launch(Manifest.permission.CAMERA) }) { Text("Camera") }; TextButton(onClick = { photoPicker.launch("image/*") }) { Text("Image") }; TextButton(onClick = { screenshotConsent.launch(screenshotCapture.consentIntent()) }) { Text("Screenshot") }; TextButton(onClick = { val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager; val clip = clipboard.primaryClip; val text = if (clip != null && clip.description.hasMimeType(ClipDescription.MIMETYPE_TEXT_PLAIN)) clip.getItemAt(0).coerceToText(context).toString() else ""; confirmClipboard = text.ifBlank { null }; if (text.isBlank()) viewModel.showError("Clipboard does not contain text to import.") }) { Text("Clipboard") } }
+        }
         Card(colors = CardDefaults.cardColors(containerColor = Panel), modifier = Modifier.weight(1f).fillMaxWidth()) {
             if (messages.isEmpty()) Column(Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
                 Icon(Icons.Outlined.AutoAwesome, null, tint = Lavender); Spacer(Modifier.height(14.dp)); Text("What would you like to move forward today?"); Spacer(Modifier.height(8.dp)); Text("Try: “Build a website for my business”, “Research this topic”, or “Plan my project”. Autonova creates visible tasks for multi-step work.", color = Muted, style = MaterialTheme.typography.bodySmall)
@@ -137,7 +158,9 @@ internal sealed interface LocalStorageAction {
             OutlinedTextField(value = draft, onValueChange = { draft = it }, modifier = Modifier.weight(1f), placeholder = { Text("Give Autonova a task or question…") }, minLines = 1, maxLines = 4)
             Spacer(Modifier.width(8.dp)); Button(onClick = { viewModel.submit(draft); draft = "" }, enabled = draft.isNotBlank()) { Text("Send") }
         }
+        if (messages.lastOrNull()?.role == "assistant") TextButton(onClick = { if (!voice.speak(messages.last().content)) viewModel.showError("Voice output is unavailable on this device.") }) { Text("Read latest response aloud") }
     }
+    confirmClipboard?.let { text -> ConfirmDialog("Import clipboard text?", "This sends the selected clipboard text to your agent workspace.", "Import", { viewModel.submit("Clipboard context from Android:\n$text"); confirmClipboard = null }) { confirmClipboard = null } }
 }
 
 @Composable private fun TasksScreen(viewModel: AutonovaViewModel, modifier: Modifier) {
@@ -175,15 +198,32 @@ internal sealed interface LocalStorageAction {
 
 @Composable private fun MoreScreen(viewModel: AutonovaViewModel, modifier: Modifier) {
     var selected by remember { mutableStateOf<String?>(null) }
-    val options = listOf("Files & Storage" to "Secure cloud files and a folder you choose on this device.", "Tools" to "Permissioned capabilities with Ask, Allow, and Deny.", "Image Studio" to "Generate images through the protected Autonova image service.", "GitHub" to "Inspect public repositories, branches, issues, pull requests, and commits.", "Usage" to "Review token, tool, and cost totals for your account.", "Settings" to "Browser sign-in, encrypted local credentials, and provider configuration.", "Activity" to "Visible agent action summaries and device events.")
+    val options = listOf("Files & Storage" to "Secure cloud files and a folder you choose on this device.", "Device capabilities" to "Voice, camera, screenshots, local AI, notifications, sharing, and safe automation boundaries.", "Tools" to "Permissioned capabilities with Ask, Allow, and Deny.", "Image Studio" to "Generate images through the protected Autonova image service.", "GitHub" to "Inspect public repositories, branches, issues, pull requests, and commits.", "Usage" to "Review token, tool, and cost totals for your account.", "Settings" to "Browser sign-in, encrypted local credentials, and provider configuration.", "Activity" to "Visible agent action summaries and device events.")
     Column(modifier.fillMaxSize().padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         PageHeader("Control plane", selected ?: "More", if (selected == null) "Every action remains visible and under your control." else null)
         if (selected == null) options.forEach { (title, detail) -> SurfaceCard(Modifier.clickable { selected = title }) { Text(title, fontWeight = FontWeight.SemiBold); Text(detail, color = Muted, style = MaterialTheme.typography.bodySmall) } } else {
-            when (selected) { "Files & Storage" -> FilesAndStorageScreen(viewModel); "Tools" -> ToolsScreen(viewModel); "Image Studio" -> ImageStudioScreen(viewModel); "GitHub" -> GitHubScreen(viewModel); "Usage" -> UsageScreen(viewModel); "Settings" -> SettingsScreen(viewModel); "Activity" -> ActivityScreen(viewModel) }
+            when (selected) { "Files & Storage" -> FilesAndStorageScreen(viewModel); "Device capabilities" -> DeviceCapabilitiesScreen(viewModel); "Tools" -> ToolsScreen(viewModel); "Image Studio" -> ImageStudioScreen(viewModel); "GitHub" -> GitHubScreen(viewModel); "Usage" -> UsageScreen(viewModel); "Settings" -> SettingsScreen(viewModel); "Activity" -> ActivityScreen(viewModel) }
             TextButton(onClick = { selected = null }) { Text("Back") }
         }
     }
 }
+
+@Composable private fun DeviceCapabilitiesScreen(viewModel: AutonovaViewModel) {
+    val context = LocalContext.current; val notifications = remember { mutableStateOf(viewModel.notificationsEnabled()) }; var localPrompt by remember { mutableStateOf("") }; var browserUrl by remember { mutableStateOf("") }; var browserConfirmation by remember { mutableStateOf(false) }
+    val notificationsPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted -> notifications.value = granted; viewModel.setNotificationsEnabled(granted); if (!granted) viewModel.showError("Notifications remain disabled until Android permission is granted.") }
+    val localModelPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> uri?.let(viewModel::importLocalModel) }
+    Text("Device capabilities", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+    Text("Autonova asks before it uses sensitive phone features. It never performs background browser, clipboard, file, or external actions without a visible user request.", color = Muted, style = MaterialTheme.typography.bodySmall)
+    SurfaceCard { Text("Task completion notifications", fontWeight = FontWeight.SemiBold); Text("Receive a local alert when a synchronized agent task completes or fails.", color = Muted, style = MaterialTheme.typography.bodySmall); Button(onClick = { notificationsPermission.launch(Manifest.permission.POST_NOTIFICATIONS) }) { Text(if (notifications.value) "Notifications enabled" else "Enable notifications") } }
+    SurfaceCard { Text("On-device local model", fontWeight = FontWeight.SemiBold); Text(viewModel.localModelStatus(), color = Muted, style = MaterialTheme.typography.bodySmall); Text("Import a compatible quantized MediaPipe .task model. Models stay in Android private storage and are not uploaded to Autonova.", color = Muted, style = MaterialTheme.typography.bodySmall); Button(onClick = { localModelPicker.launch(arrayOf("application/octet-stream")) }) { Text("Import local model") }; OutlinedTextField(value = localPrompt, onValueChange = { localPrompt = it }, modifier = Modifier.fillMaxWidth(), label = { Text("Private local prompt") }); Button(onClick = { viewModel.runLocalModel(localPrompt) }, enabled = localPrompt.isNotBlank()) { Text("Run locally") } }
+    SurfaceCard { Text("Browser handoff", fontWeight = FontWeight.SemiBold); Text("Open a site visibly in your preferred browser. Autonova does not silently browse, log in, post, or purchase on your behalf.", color = Muted, style = MaterialTheme.typography.bodySmall); OutlinedTextField(value = browserUrl, onValueChange = { browserUrl = it }, modifier = Modifier.fillMaxWidth(), label = { Text("https://example.com") }, singleLine = true); Button(onClick = { browserConfirmation = browserUrl.startsWith("https://") }) { Text("Open website") } }
+    SurfaceCard { Text("Sharing and clipboard", fontWeight = FontWeight.SemiBold); Text("Use Android Share from another app to open Autonova with text, images, PDFs, or files. Clipboard import is available from Command and always asks for confirmation.", color = Muted, style = MaterialTheme.typography.bodySmall) }
+    SurfaceCard { Text("Safe automation", fontWeight = FontWeight.SemiBold); Text("Background sync only reads your protected workspace when Android allows network work. Browser automation, external posting, file deletion, sharing, and clipboard imports require a direct, visible confirmation.", color = Muted, style = MaterialTheme.typography.bodySmall) }
+    if (browserConfirmation) ConfirmDialog("Open website?", "Open $browserUrl in your browser?", "Open", { runCatching { context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, Uri.parse(browserUrl))) }.onFailure { viewModel.showError("No browser could open this URL.") }; browserConfirmation = false }, { browserConfirmation = false })
+}
+
+private fun uploadSelectedVisual(context: Context, uri: Uri, label: String, viewModel: AutonovaViewModel) { runCatching { context.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: error("Unable to read selected $label.") }.onSuccess { viewModel.uploadDeviceContext("$label-${System.currentTimeMillis()}.bin", context.contentResolver.getType(uri) ?: "application/octet-stream", it) }.onFailure { viewModel.showError(it.message ?: "Unable to import $label.") } }
+private fun uploadCameraBitmap(bitmap: Bitmap, viewModel: AutonovaViewModel) { val bytes = ByteArrayOutputStream().use { stream -> bitmap.compress(Bitmap.CompressFormat.JPEG, 90, stream); stream.toByteArray() }; viewModel.uploadDeviceContext("camera-${System.currentTimeMillis()}.jpg", "image/jpeg", bytes) }
 
 @Composable private fun FilesAndStorageScreen(viewModel: AutonovaViewModel) {
     val remoteFiles by viewModel.files.collectAsState(); val context = LocalContext.current; val storage = remember(context) { DeviceStorage(context, SecureConfig(context)) }; var localFiles by remember { mutableStateOf(storage.listFiles()) }; var noteTitle by remember { mutableStateOf("") }; var noteContent by remember { mutableStateOf("") }; var pendingAction by remember { mutableStateOf<LocalStorageAction?>(null) }

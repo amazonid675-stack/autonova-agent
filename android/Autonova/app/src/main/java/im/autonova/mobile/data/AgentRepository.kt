@@ -2,6 +2,7 @@ package im.autonova.mobile.data
 
 import android.os.Build
 import android.util.Base64
+import android.content.Context
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -12,7 +13,7 @@ import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 
 /** Keeps protected backend access, encrypted configuration, and Room cache updates out of Compose UI. */
-class AgentRepository(private val cache: AgentCacheDao, private val config: SecureConfig) {
+class AgentRepository(private val context: Context, private val cache: AgentCacheDao, private val config: SecureConfig) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val _messages = MutableStateFlow<List<ChatMessage>>(emptyList()); private val _tasks = MutableStateFlow<List<AgentTask>>(emptyList()); private val _projects = MutableStateFlow<List<AgentProject>>(emptyList())
     private val _memories = MutableStateFlow<List<MemoryItem>>(emptyList()); private val _activity = MutableStateFlow<List<ActivityItem>>(emptyList())
@@ -25,10 +26,12 @@ class AgentRepository(private val cache: AgentCacheDao, private val config: Secu
     private fun api(): MobileAgentApi? = config.accessToken()?.let { MobileAgentApi(config.apiBaseUrl(), it) }
     suspend fun refresh(): Boolean {
         val api = api() ?: return false
+        val previousStatuses = _tasks.value.associate { it.id to it.status.name }
         api.registerDevice(DeviceRegistration(config.deviceId(), "Android ${Build.MODEL}", false))
         val snapshot = api.bootstrap()
         cache.upsertProjects(snapshot.projects.map { CachedProject(it.id.toString(), it.name, it.description ?: "") }); cache.upsertTasks(snapshot.tasks.map { CachedTask(it.id.toString(), it.request, it.status, System.currentTimeMillis()) }); cache.upsertMemories(snapshot.memories.map { CachedMemory(it.id.toString(), it.title, it.content, it.layer) }); cache.upsertActivity(snapshot.activity.map { CachedActivity(it.id.toString(), it.title, it.detail ?: "", it.eventType) })
         _files.value = snapshot.files.map { FileItem(it.id.toString(), it.name, it.mimeType, it.sizeBytes) }; _tools.value = snapshot.toolPermissions.map { ToolItem(it.toolKey, it.policy) }; _provider.value = snapshot.provider?.let { ProviderItem(it.name, it.providerType, it.activeModel, it.costMode, it.hasApiKey) }
+        if (config.notificationsEnabled()) snapshot.tasks.filter { it.status in listOf("COMPLETED", "FAILED") && previousStatuses[it.id.toString()] != it.status }.forEach { AgentNotifier(context).notifyTask(it.id.toString(), it.request, it.status) }
         return true
     }
     suspend fun submit(text: String): Boolean {
@@ -46,6 +49,7 @@ class AgentRepository(private val cache: AgentCacheDao, private val config: Secu
     suspend fun deleteMemory(id: String): Boolean = runCatching { api()?.deleteMemory(id) ?: error("Connect the secure session first."); refresh() }.isSuccess
     suspend fun setToolPolicy(key: String, policy: String): Boolean = runCatching { api()?.setToolPolicy(key, policy) ?: error("Connect the secure session first."); refresh() }.isSuccess
     suspend fun uploadFile(document: LocalDocument, bytes: ByteArray): Boolean = runCatching { require(bytes.size <= 10 * 1024 * 1024) { "Files must be 10 MB or smaller." }; api()?.uploadFile(document.name, document.mimeType, Base64.encodeToString(bytes, Base64.NO_WRAP)) ?: error("Connect the secure session first."); refresh() }.isSuccess
+    suspend fun uploadDeviceContext(name: String, mimeType: String, bytes: ByteArray): Boolean = runCatching { require(bytes.size in 1..10 * 1024 * 1024) { "Device context must be 10 MB or smaller." }; api()?.uploadFile(name, mimeType, Base64.encodeToString(bytes, Base64.NO_WRAP)) ?: error("Connect the secure session first."); refresh() }.isSuccess
     suspend fun saveProvider(name: String, providerType: String, baseUrl: String, model: String, apiKey: String, costMode: String): Boolean = runCatching { api()?.saveProvider(ProviderRequest(name, providerType, baseUrl.ifBlank { null }, model.ifBlank { null }, apiKey.ifBlank { null }, costMode)) ?: error("Connect the secure session first."); refresh() }.isSuccess
     suspend fun refreshUsage(): Boolean = runCatching { val wire = api()?.usage() ?: error("Connect the secure session first."); _usage.value = UsageSummary(wire.totals.inputTokens, wire.totals.outputTokens, wire.totals.toolCalls, wire.totals.estimatedCostMicros, wire.records.map { UsageRecord(it.model, it.inputTokens, it.outputTokens, it.toolCalls) }) }.isSuccess
     suspend fun generateImage(prompt: String): Boolean = runCatching { _generatedImageUrl.value = (api()?.generateImage(prompt) ?: error("Connect the secure session first.")).url; refresh() }.isSuccess

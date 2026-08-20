@@ -12,6 +12,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
 import org.junit.runner.RunWith
+import java.io.File
 
 @RunWith(AndroidJUnit4::class)
 class SecureConfigInstrumentedTest {
@@ -38,5 +39,20 @@ class SecureConfigInstrumentedTest {
         try { config.saveApiBaseUrl("http://localhost:3000"); fail("Unsafe endpoint should be rejected") } catch (_: IllegalArgumentException) { }
         try { config.saveAccessToken("access-token") ; fail("Invalid bearer token should be rejected") } catch (_: IllegalArgumentException) { }
         try { config.saveStorageTree("https://example.com/documents"); fail("Non-document URI should be rejected") } catch (_: IllegalArgumentException) { }
+    }
+
+    @Test fun encrypted_configuration_persists_private_local_model_choice_and_notification_preference() {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val config = SecureConfig(context)
+        val modelPath = File(context.filesDir, "models/test-local.task").absolutePath
+        config.saveLocalModelPath(modelPath)
+        config.setNotificationsEnabled(true)
+        assertEquals(modelPath, config.localModelPath())
+        assertTrue(config.notificationsEnabled())
+        config.clearLocalModel()
+        config.setNotificationsEnabled(false)
+        assertNull(config.localModelPath())
+        assertFalse(config.notificationsEnabled())
+        try { config.saveLocalModelPath("/sdcard/unsafe.task"); fail("Non-private model path should be rejected") } catch (_: IllegalArgumentException) { }
     }
 }

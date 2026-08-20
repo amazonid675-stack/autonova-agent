@@ -22,4 +22,11 @@ class NavigationTest {
         compose.onNodeWithText("Tasks").performClick()
         compose.onNodeWithText("Create protected tasks, then observe planning, execution, verification, and completion from the same workspace.").assertIsDisplayed()
     }
+
+    @Test fun more_menu_opens_device_capability_controls() {
+        compose.onNodeWithText("More").performClick()
+        compose.onNodeWithText("Device capabilities").performClick()
+        compose.onNodeWithText("Task completion notifications").assertIsDisplayed()
+        compose.onNodeWithText("On-device local model").assertIsDisplayed()
+    }
 }

@@ -55,3 +55,11 @@
 - [x] Create an auditable Android capability reconciliation with file-level evidence and an explicit implemented-versus-deferred permission audit.
 - [x] Add fresh-launch Android UI coverage for the browser sign-in entry point and command-center readiness.
 - [x] Add focused Android deep-link and bearer-auth transport regression coverage plus first-launch release validation evidence.
+- [ ] Add runtime-permission-gated voice capture, transcription, and text-to-speech agent responses.
+- [ ] Add user-confirmed camera capture and screenshot ingestion for agent file context.
+- [ ] Add Android share-target ingestion for text and files with explicit agent-import feedback.
+- [ ] Add runtime notification permission, notification channel, and task-completion local notifications.
+- [ ] Add a safe local-model capability contract with explicit availability status and user-selected execution mode.
+- [ ] Add documented, user-confirmed automation boundaries for browser, clipboard, and background execution.
+- [ ] Integrate the remaining device capabilities into the mobile command center and test them on an Android emulator.
+- [ ] Build, validate, and deliver a revised APK that includes the completed Android capability set.

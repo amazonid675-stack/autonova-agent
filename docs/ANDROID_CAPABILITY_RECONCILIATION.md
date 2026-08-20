@@ -2,7 +2,7 @@
 
 ## Release scope
 
-This document reconciles the PDF-derived mobile requirements with the current Android source tree. Its purpose is to record **what the corrected APK actually does today**, the Android permissions that are genuinely exercised, and the native features that remain deferred. It should be read together with `docs/ANDROID_REBUILD_REQUIREMENTS.md`.
+This document reconciles the PDF-derived mobile requirements with the current Android source tree. Its purpose is to record **what the corrected APK actually does today**, the Android permissions that are genuinely exercised, and the safety boundaries applied to local execution. It should be read together with `docs/ANDROID_REBUILD_REQUIREMENTS.md`.
 
 The rejected behavior has been removed. Android no longer opens to an empty cookie-entry setup page: the command center offers a clear browser-based **Connect Autonova** action and remains capable of saving a local plan before sign-in.
 
@@ -20,6 +20,12 @@ The rejected behavior has been removed. Android no longer opens to an empty cook
 | Local file access and document workflow | Implemented with scoped boundary | `data/DeviceStorage.kt`, `ui/AutonovaApp.kt` | The user chooses a document-provider folder; create, open, share, delete, and upload are explicit actions. Create/open/share/delete require confirmation. |
 | Local persistence and offline visibility | Implemented foundation | `data/LocalStore.kt`, `sync/AgentSyncWorker.kt`, `data/AgentRepository.kt` | Room caches agent data and a local plan can be shown before an account connects. |
 | Transparent errors and execution feedback | Implemented | `ui/AutonovaApp.kt`, `ui/AutonovaViewModel.kt` | A workspace-wide banner reports connection requirements, work in progress, completion, and failure for protected actions. |
+| Voice input and output | Implemented | `data/DeviceServices.kt`, `ui/AutonovaApp.kt` | The command screen requests microphone permission before speech recognition and can read the latest agent response through Android text-to-speech. |
+| Camera, image, and screenshot context | Implemented | `data/DeviceServices.kt`, `ui/AutonovaApp.kt`, `data/AgentRepository.kt` | Camera use requires Android permission; screenshot capture invokes Android’s system consent screen; selected visual content is uploaded only through an explicit action. |
+| Share sheet and clipboard | Implemented | `MainActivity.kt`, `AndroidManifest.xml`, `ui/AutonovaApp.kt` | Android Share accepts text, images, PDFs, and streams; clipboard text is imported only after visible confirmation. |
+| Notifications and background refresh | Implemented with constrained boundary | `data/DeviceServices.kt`, `sync/AgentSyncWorker.kt` | Android notification permission is requested in the capability screen; network-constrained periodic refresh can alert only for terminal task state changes. |
+| Local AI | Implemented with user-supplied model | `data/DeviceServices.kt`, `data/SecureConfig.kt`, `ui/AutonovaApp.kt` | A compatible quantized MediaPipe `.task` model is copied to private app storage and runs locally on supported hardware. No model is bundled or silently downloaded. |
+| Browser handoff | Implemented with confirmation boundary | `ui/AutonovaApp.kt` | A user can open an HTTPS site in the device browser after a confirmation dialog; the app does not silently browse, log in, post, purchase, or bypass browser permissions. |
 
 ## Android permission audit
 
@@ -28,11 +34,11 @@ The rejected behavior has been removed. Android no longer opens to an empty cook
 | Internet | Implemented and exercised | Declared in `AndroidManifest.xml`; required for the protected mobile API and browser sign-in. |
 | Scoped document-folder access | Implemented and exercised | `ActivityResultContracts.OpenDocumentTree` in `ui/AutonovaApp.kt`; `DeviceStorage.kt` persists only the user-selected URI. No broad storage permission is requested. |
 | Browser deep link | Implemented and exercised | `autonova://auth` intent filter in `AndroidManifest.xml`; handled by `MainActivity.kt`. |
-| Notifications | Declared, not yet wired | `POST_NOTIFICATIONS` exists in the manifest, but no runtime permission prompt or push-delivery client is implemented in this release. |
-| Microphone / voice input or output | Declared, not yet wired | `RECORD_AUDIO` is declared, but there is no runtime microphone permission request, recorder, speech-to-text, or text-to-speech workflow. |
-| Camera / screenshot capture | Declared, not yet wired | `CAMERA` is declared, but there is no runtime camera permission request, capture flow, or screenshot-analysis flow. |
-| Share-target ingestion and clipboard automation | Deferred | No share receiver or clipboard contract is currently implemented. |
-| Background autonomous execution | Foundation only | `AgentSyncWorker.kt` supports scheduled refresh/retry foundations; it does not bypass Android lifecycle rules or execute dangerous actions autonomously. |
+| Notifications | Implemented and user-gated | `POST_NOTIFICATIONS` is requested only from the capability screen; terminal task updates are delivered through an Android notification channel after the user grants permission. |
+| Microphone / voice input or output | Implemented and user-gated | `RECORD_AUDIO` is requested immediately before speech recognition; Android text-to-speech reads agent responses without recording audio. |
+| Camera / screenshot capture | Implemented and user-gated | `CAMERA` is requested immediately before capture; screen capture uses Android’s MediaProjection consent; images are explicit agent uploads. |
+| Share-target ingestion and clipboard import | Implemented with confirmation | `ACTION_SEND` intent filters route shared items into `MainActivity`; clipboard content uses an in-app confirmation dialog before submission. |
+| Background agent visibility | Implemented with safe scope | WorkManager runs network-constrained read synchronization and can notify terminal task status only; it never launches dangerous tools or external actions autonomously. |
 
 ## Security and execution boundaries
 
@@ -40,6 +46,6 @@ The corrected client never asks the user to paste an HTTP session cookie. A rand
 
 The agent is not granted unrestricted phone access. Local storage is limited to a document-provider folder selected by the user, and local file creation, sharing, opening, and deletion are confirmation-gated. Controls that call protected cloud APIs show clear feedback if the account is disconnected or a request fails; they are not represented as completing silently.
 
-## Deferred roadmap
+## Intentional safeguards
 
-Native microphone conversation, text-to-speech, camera and screenshot ingestion, share-target handling, runtime push-notification enrollment, browser/clipboard automation, and local on-device models remain separate capabilities. They must be implemented with runtime permission requests, confirmation where the action is consequential, lifecycle-safe background rules, secure server contracts, and automated Android coverage before they are considered available.
+The mobile application does not treat broad device access as standing permission to act. Voice begins only after microphone approval. Camera capture, screen capture, file upload, clipboard import, and browser opening are initiated by a visible user action; screenshot capture additionally requires Android’s system-level consent. Local models are user-supplied and stored in private app storage, and the implementation does not claim a bundled model where none exists. Background work is limited to network-constrained refresh and terminal-state notifications, not autonomous browser sessions, posting, purchasing, deletion, or other consequential actions.
