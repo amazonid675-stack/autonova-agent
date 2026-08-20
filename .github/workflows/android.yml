@@ -50,8 +50,8 @@ jobs:
             adb shell getprop ro.build.version.sdk
             adb shell settings put global verifier_verify_adb_installs 0 || true
             adb shell settings put global package_verifier_enable 0 || true
-            adb install -r app/build/outputs/apk/debug/app-debug.apk
-            adb install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+            adb install -r android/Autonova/app/build/outputs/apk/debug/app-debug.apk
+            adb install -r android/Autonova/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
             adb shell am instrument -w -r -e clearPackageData true im.autonova.mobile.test/androidx.test.runner.AndroidJUnitRunner
       - name: Upload verified Android debug APK
         if: success()
