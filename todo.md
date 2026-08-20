@@ -55,12 +55,14 @@
 - [x] Create an auditable Android capability reconciliation with file-level evidence and an explicit implemented-versus-deferred permission audit.
 - [x] Add fresh-launch Android UI coverage for the browser sign-in entry point and command-center readiness.
 - [x] Add focused Android deep-link and bearer-auth transport regression coverage plus first-launch release validation evidence.
-- [ ] Add runtime-permission-gated voice capture, transcription, and text-to-speech agent responses.
-- [ ] Add user-confirmed camera capture and screenshot ingestion for agent file context.
-- [ ] Add Android share-target ingestion for text and files with explicit agent-import feedback.
-- [ ] Add runtime notification permission, notification channel, and task-completion local notifications.
-- [ ] Add a safe local-model capability contract with explicit availability status and user-selected execution mode.
-- [ ] Add documented, user-confirmed automation boundaries for browser, clipboard, and background execution.
-- [ ] Integrate the remaining device capabilities into the mobile command center and test them on an Android emulator.
-- [ ] Build, validate, and deliver a revised APK that includes the completed Android capability set.
-- [ ] Make Android emulator CI install the app and test APKs explicitly, avoiding the runner's incorrect API-level detection during split-package installation.
+- [x] Add runtime-permission-gated voice capture, transcription, and text-to-speech agent responses.
+- [x] Add user-confirmed camera capture and screenshot ingestion for agent file context.
+- [x] Add Android share-target ingestion for text and files with explicit agent-import feedback.
+- [x] Add runtime notification permission, notification channel, and task-completion local notifications.
+- [x] Add a safe local-model capability contract with explicit availability status and user-selected execution mode.
+- [x] Add documented, user-confirmed automation boundaries for browser, clipboard, and background execution.
+- [x] Integrate the remaining device capabilities into the mobile command center and test them on an Android emulator.
+- [x] Build, validate, and deliver a revised APK that includes the completed Android capability set.
+- [x] Make Android emulator CI install the app and test APKs explicitly, avoiding the runner's incorrect API-level detection during split-package installation.
+- [ ] Add focused emulator UI evidence for the device-capability command center, including notifications, local model, browser handoff, sharing/clipboard, and safe automation boundaries.
+- [ ] Attach the final verified APK to the user with safe installation guidance.

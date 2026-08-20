@@ -4,6 +4,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.test.ext.junit.rules.ActivityScenarioRule
 import im.autonova.mobile.MainActivity
 import org.junit.Rule
@@ -28,5 +29,21 @@ class NavigationTest {
         compose.onNodeWithText("Device capabilities").performClick()
         compose.onNodeWithText("Task completion notifications").assertIsDisplayed()
         compose.onNodeWithText("On-device local model").assertIsDisplayed()
+    }
+
+    @Test fun command_center_and_device_capabilities_expose_visible_permission_boundaries() {
+        compose.onNodeWithText("Device inputs").assertIsDisplayed()
+        compose.onNodeWithText("Voice").assertIsDisplayed()
+        compose.onNodeWithText("Camera").assertIsDisplayed()
+        compose.onNodeWithText("Screenshot").assertIsDisplayed()
+        compose.onNodeWithText("Clipboard").assertIsDisplayed()
+
+        compose.onNodeWithText("More").performClick()
+        compose.onNodeWithText("Device capabilities").performClick()
+        compose.onNodeWithText("Task completion notifications").assertIsDisplayed()
+        compose.onNodeWithText("On-device local model").assertIsDisplayed()
+        compose.onNodeWithText("Browser handoff").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Sharing and clipboard").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Safe automation").performScrollTo().assertIsDisplayed()
     }
 }
