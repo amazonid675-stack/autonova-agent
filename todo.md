@@ -53,3 +53,4 @@
 - [x] Add Android user-visible authentication, loading, success, and failure feedback for protected command-center actions.
 - [x] Add clear loading and failure states to the browser-based mobile sign-in flow.
 - [x] Create an auditable Android capability reconciliation with file-level evidence and an explicit implemented-versus-deferred permission audit.
+- [x] Add fresh-launch Android UI coverage for the browser sign-in entry point and command-center readiness.
