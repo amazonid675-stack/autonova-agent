@@ -35,5 +35,5 @@ class AutonovaViewModel(application: Application) : AndroidViewModel(application
     fun saveProvider(name: String, providerType: String, baseUrl: String, model: String, apiKey: String, costMode: String) = viewModelScope.launch { repository.saveProvider(name, providerType, baseUrl, model, apiKey, costMode) }
     fun refreshUsage() = viewModelScope.launch { repository.refreshUsage() }
     fun generateImage(prompt: String) = viewModelScope.launch { repository.generateImage(prompt) }
-    fun inspectGitHub(repository: String) = viewModelScope.launch { repository.inspectGitHub(repository) }
+    fun inspectGitHub(repositoryName: String) = viewModelScope.launch { repository.inspectGitHub(repositoryName) }
 }
