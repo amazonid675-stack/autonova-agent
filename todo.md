@@ -37,4 +37,4 @@
 - [x] Render Android SSE response deltas progressively in the chat interface rather than only after stream completion.
 - [x] Surface cached projects and implement a durable, user-approved queued mobile action foundation with WorkManager.
 - [x] Extend Android SecureConfig tests to assert unsafe endpoint and invalid session-cookie rejection, then rerun GitHub Actions.
-- [ ] Run Android instrumentation tests on an emulator in GitHub Actions so secure configuration rejection behavior is executed and verified.
+- [x] Run Android instrumentation tests on an emulator in GitHub Actions so secure configuration rejection behavior is executed and verified.
