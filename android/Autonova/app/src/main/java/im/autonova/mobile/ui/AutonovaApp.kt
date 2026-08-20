@@ -170,7 +170,7 @@ internal sealed interface LocalStorageAction {
     if (storage.hasFolder()) {
         OutlinedTextField(value = noteTitle, onValueChange = { noteTitle = it }, modifier = Modifier.fillMaxWidth(), label = { Text("New local note") })
         OutlinedTextField(value = noteContent, onValueChange = { noteContent = it }, modifier = Modifier.fillMaxWidth(), label = { Text("Note text") }, minLines = 2)
-        FilesAndStorageActionControls(null, noteContent.isNotBlank()) { pendingAction = it }
+        FilesAndStorageActionControls(null, noteContent.isNotBlank(), onActionRequested = { pendingAction = it })
         Text("Selected folder", color = Lavender, style = MaterialTheme.typography.labelSmall)
         localFiles.forEach { document -> SurfaceCard { Text(document.name, fontWeight = FontWeight.SemiBold); Text("${document.mimeType} · ${document.sizeBytes} bytes", color = Muted, style = MaterialTheme.typography.bodySmall); FilesAndStorageActionControls(document, true, { pendingAction = it }) { storage.readBytes(document)?.let { viewModel.uploadLocalFile(document, it) } } } }
     } else Text("Choose a document-provider folder to enable scoped local storage actions.", color = Muted)
