@@ -30,9 +30,10 @@ import java.util.Locale
 import java.util.UUID
 
 class VoiceAssistant(private val context: Context) : TextToSpeech.OnInitListener {
-    private var textToSpeech: TextToSpeech? = TextToSpeech(context, this)
+    private var textToSpeech: TextToSpeech? = null
     private var ready = false
-    override fun onInit(status: Int) { ready = status == TextToSpeech.SUCCESS; if (ready) textToSpeech?.language = Locale.getDefault() }
+    private var pendingSpeech: String? = null
+    override fun onInit(status: Int) { ready = status == TextToSpeech.SUCCESS; if (ready) { textToSpeech?.language = Locale.getDefault(); pendingSpeech?.let { textToSpeech?.speak(it, TextToSpeech.QUEUE_FLUSH, null, UUID.randomUUID().toString()) }; pendingSpeech = null } }
     fun listen(onPartial: (String) -> Unit, onFinal: (String) -> Unit, onError: (String) -> Unit) {
         if (!SpeechRecognizer.isRecognitionAvailable(context)) { onError("Speech recognition is unavailable on this device."); return }
         val recognizer = SpeechRecognizer.createSpeechRecognizer(context)
@@ -49,7 +50,7 @@ class VoiceAssistant(private val context: Context) : TextToSpeech.OnInitListener
         })
         recognizer.startListening(Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply { putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM); putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true) })
     }
-    fun speak(text: String): Boolean { if (!ready || text.isBlank()) return false; return textToSpeech?.speak(text.take(3500), TextToSpeech.QUEUE_FLUSH, null, UUID.randomUUID().toString()) == TextToSpeech.SUCCESS }
+    fun speak(text: String): Boolean { if (text.isBlank()) return false; val output = text.take(3500); if (textToSpeech == null) { pendingSpeech = output; textToSpeech = TextToSpeech(context, this); return true }; return if (ready) textToSpeech?.speak(output, TextToSpeech.QUEUE_FLUSH, null, UUID.randomUUID().toString()) == TextToSpeech.SUCCESS else { pendingSpeech = output; true } }
     fun close() { textToSpeech?.stop(); textToSpeech?.shutdown(); textToSpeech = null }
 }
 
