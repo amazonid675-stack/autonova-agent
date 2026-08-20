@@ -4,6 +4,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.foundation.layout.Column
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -35,9 +36,11 @@ class DeviceActionConfirmationTest {
     @Test fun files_storage_controls_route_every_local_action_through_confirmation() {
         compose.setContent {
             var pendingAction by mutableStateOf<LocalStorageAction?>(null)
-            FilesAndStorageActionControls(null, true, onActionRequested = { pendingAction = it })
-            FilesAndStorageActionControls(document(), true, { pendingAction = it })
-            LocalStorageActionConfirmation(pendingAction, "draft", {}, {}, {}, {}, { pendingAction = null })
+            Column {
+                FilesAndStorageActionControls(null, true, onActionRequested = { pendingAction = it })
+                FilesAndStorageActionControls(document(), true, { pendingAction = it })
+                LocalStorageActionConfirmation(pendingAction, "draft", {}, {}, {}, {}, { pendingAction = null })
+            }
         }
         compose.onNodeWithText("Create note").performClick(); compose.onNodeWithText("Create local note?").assertIsDisplayed(); compose.onNodeWithText("Cancel").performClick()
         compose.onNodeWithText("Open").performClick(); compose.onNodeWithText("Open local file?").assertIsDisplayed(); compose.onNodeWithText("Cancel").performClick()
