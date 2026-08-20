@@ -3,10 +3,15 @@ package im.autonova.mobile
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import android.net.Uri
 import im.autonova.mobile.data.LocalDocument
 import im.autonova.mobile.ui.LocalStorageAction
 import im.autonova.mobile.ui.LocalStorageActionConfirmation
+import im.autonova.mobile.ui.FilesAndStorageActionControls
 import org.junit.Rule
 import org.junit.Test
 
@@ -26,4 +31,17 @@ class DeviceActionConfirmationTest {
     @Test fun local_open_action_requires_visible_confirmation() { render(LocalStorageAction.Open(document())); compose.onNodeWithText("Open local file?").assertIsDisplayed() }
     @Test fun local_share_action_requires_visible_confirmation() { render(LocalStorageAction.Share(document())); compose.onNodeWithText("Share local file?").assertIsDisplayed() }
     @Test fun local_delete_action_requires_visible_confirmation() { render(LocalStorageAction.Delete(document())); compose.onNodeWithText("Delete local file?").assertIsDisplayed() }
+
+    @Test fun files_storage_controls_route_every_local_action_through_confirmation() {
+        compose.setContent {
+            var pendingAction by mutableStateOf<LocalStorageAction?>(null)
+            FilesAndStorageActionControls(null, true) { pendingAction = it }
+            FilesAndStorageActionControls(document(), true, { pendingAction = it })
+            LocalStorageActionConfirmation(pendingAction, "draft", {}, {}, {}, {}, { pendingAction = null })
+        }
+        compose.onNodeWithText("Create note").performClick(); compose.onNodeWithText("Create local note?").assertIsDisplayed(); compose.onNodeWithText("Cancel").performClick()
+        compose.onNodeWithText("Open").performClick(); compose.onNodeWithText("Open local file?").assertIsDisplayed(); compose.onNodeWithText("Cancel").performClick()
+        compose.onNodeWithText("Share").performClick(); compose.onNodeWithText("Share local file?").assertIsDisplayed(); compose.onNodeWithText("Cancel").performClick()
+        compose.onNodeWithText("Delete").performClick(); compose.onNodeWithText("Delete local file?").assertIsDisplayed()
+    }
 }

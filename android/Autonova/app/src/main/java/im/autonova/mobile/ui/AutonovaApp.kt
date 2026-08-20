@@ -170,9 +170,9 @@ internal sealed interface LocalStorageAction {
     if (storage.hasFolder()) {
         OutlinedTextField(value = noteTitle, onValueChange = { noteTitle = it }, modifier = Modifier.fillMaxWidth(), label = { Text("New local note") })
         OutlinedTextField(value = noteContent, onValueChange = { noteContent = it }, modifier = Modifier.fillMaxWidth(), label = { Text("Note text") }, minLines = 2)
-        Button(onClick = { pendingAction = LocalStorageAction.CreateNote }, enabled = noteContent.isNotBlank()) { Text("Create note") }
+        FilesAndStorageActionControls(null, noteContent.isNotBlank()) { pendingAction = it }
         Text("Selected folder", color = Lavender, style = MaterialTheme.typography.labelSmall)
-        localFiles.forEach { document -> SurfaceCard { Text(document.name, fontWeight = FontWeight.SemiBold); Text("${document.mimeType} · ${document.sizeBytes} bytes", color = Muted, style = MaterialTheme.typography.bodySmall); Row { TextButton(onClick = { pendingAction = LocalStorageAction.Open(document) }) { Text("Open") }; TextButton(onClick = { pendingAction = LocalStorageAction.Share(document) }) { Text("Share") }; TextButton(onClick = { storage.readBytes(document)?.let { viewModel.uploadLocalFile(document, it) } }) { Text("Upload") }; TextButton(onClick = { pendingAction = LocalStorageAction.Delete(document) }) { Text("Delete") } } } }
+        localFiles.forEach { document -> SurfaceCard { Text(document.name, fontWeight = FontWeight.SemiBold); Text("${document.mimeType} · ${document.sizeBytes} bytes", color = Muted, style = MaterialTheme.typography.bodySmall); FilesAndStorageActionControls(document, true, { pendingAction = it }) { storage.readBytes(document)?.let { viewModel.uploadLocalFile(document, it) } } } }
     } else Text("Choose a document-provider folder to enable scoped local storage actions.", color = Muted)
     if (remoteFiles.isNotEmpty()) { Text("Autonova workspace files", color = Lavender, style = MaterialTheme.typography.labelSmall); remoteFiles.forEach { file -> RemoteFileRow(file) } }
     LocalStorageActionConfirmation(pendingAction, noteTitle, { storage.createNote(noteTitle, noteContent); noteTitle = ""; noteContent = ""; localFiles = storage.listFiles(); pendingAction = null }, { document -> runCatching { storage.open(document) }; pendingAction = null }, { document -> runCatching { storage.share(document) }; pendingAction = null }, { document -> storage.delete(document); localFiles = storage.listFiles(); pendingAction = null }, { pendingAction = null })
@@ -186,6 +186,11 @@ internal sealed interface LocalStorageAction {
         is LocalStorageAction.Delete -> ConfirmDialog("Delete local file?", "This permanently deletes ‘${action.document.name}’ from the folder you selected.", "Delete", { onDelete(action.document) }, onDismiss)
         null -> Unit
     }
+}
+
+@Composable internal fun FilesAndStorageActionControls(document: LocalDocument?, createEnabled: Boolean, onActionRequested: (LocalStorageAction) -> Unit, onUpload: (() -> Unit)? = null) {
+    if (document == null) Button(onClick = { onActionRequested(LocalStorageAction.CreateNote) }, enabled = createEnabled) { Text("Create note") }
+    else Row { TextButton(onClick = { onActionRequested(LocalStorageAction.Open(document)) }) { Text("Open") }; TextButton(onClick = { onActionRequested(LocalStorageAction.Share(document)) }) { Text("Share") }; onUpload?.let { TextButton(onClick = it) { Text("Upload") } }; TextButton(onClick = { onActionRequested(LocalStorageAction.Delete(document)) }) { Text("Delete") } }
 }
 
 @Composable private fun RemoteFileRow(file: FileItem) = SurfaceCard { Text(file.name, fontWeight = FontWeight.SemiBold); Text("${file.mimeType} · ${file.sizeBytes} bytes", color = Muted, style = MaterialTheme.typography.bodySmall) }
