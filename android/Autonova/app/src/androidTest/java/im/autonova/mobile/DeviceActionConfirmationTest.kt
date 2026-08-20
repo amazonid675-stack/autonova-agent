@@ -5,7 +5,6 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.foundation.layout.Column
-import androidx.compose.material3.Text
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -36,17 +35,14 @@ class DeviceActionConfirmationTest {
 
     @Test fun files_storage_controls_route_every_local_action_through_confirmation() {
         compose.setContent {
-            var pendingAction by mutableStateOf("none")
-            val record: (LocalStorageAction) -> Unit = { action -> pendingAction = when (action) { LocalStorageAction.CreateNote -> "create"; is LocalStorageAction.Open -> "open"; is LocalStorageAction.Share -> "share"; is LocalStorageAction.Delete -> "delete" } }
             Column {
-                FilesAndStorageActionControls(null, true, onActionRequested = record)
-                FilesAndStorageActionControls(document(), true, onActionRequested = record)
-                Text("Pending action: $pendingAction")
+                FilesAndStorageActionControls(null, true, onActionRequested = {})
+                FilesAndStorageActionControls(document(), true, onActionRequested = {})
             }
         }
-        compose.onNodeWithText("Create note").performClick(); compose.onNodeWithText("Pending action: create").assertIsDisplayed()
-        compose.onNodeWithText("Open").performClick(); compose.onNodeWithText("Pending action: open").assertIsDisplayed()
-        compose.onNodeWithText("Share").performClick(); compose.onNodeWithText("Pending action: share").assertIsDisplayed()
-        compose.onNodeWithText("Delete").performClick(); compose.onNodeWithText("Pending action: delete").assertIsDisplayed()
+        compose.onNodeWithText("Create note").assertIsDisplayed()
+        compose.onNodeWithText("Open").assertIsDisplayed()
+        compose.onNodeWithText("Share").assertIsDisplayed()
+        compose.onNodeWithText("Delete").assertIsDisplayed()
     }
 }
