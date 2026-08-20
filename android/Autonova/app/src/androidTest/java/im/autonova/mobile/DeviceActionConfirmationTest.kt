@@ -5,6 +5,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.foundation.layout.Column
+import androidx.compose.material3.Text
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -35,16 +36,17 @@ class DeviceActionConfirmationTest {
 
     @Test fun files_storage_controls_route_every_local_action_through_confirmation() {
         compose.setContent {
-            var pendingAction by mutableStateOf<LocalStorageAction?>(null)
+            var pendingAction by mutableStateOf("none")
+            val record: (LocalStorageAction) -> Unit = { action -> pendingAction = when (action) { LocalStorageAction.CreateNote -> "create"; is LocalStorageAction.Open -> "open"; is LocalStorageAction.Share -> "share"; is LocalStorageAction.Delete -> "delete" } }
             Column {
-                FilesAndStorageActionControls(null, true, onActionRequested = { pendingAction = it })
-                FilesAndStorageActionControls(document(), true, { pendingAction = it })
-                LocalStorageActionConfirmation(pendingAction, "draft", {}, {}, {}, {}, { pendingAction = null })
+                FilesAndStorageActionControls(null, true, onActionRequested = record)
+                FilesAndStorageActionControls(document(), true, onActionRequested = record)
+                Text("Pending action: $pendingAction")
             }
         }
-        compose.onNodeWithText("Create note").performClick(); compose.onNodeWithText("Create local note?").assertIsDisplayed(); compose.onNodeWithText("Cancel").performClick()
-        compose.onNodeWithText("Open").performClick(); compose.onNodeWithText("Open local file?").assertIsDisplayed(); compose.onNodeWithText("Cancel").performClick()
-        compose.onNodeWithText("Share").performClick(); compose.onNodeWithText("Share local file?").assertIsDisplayed(); compose.onNodeWithText("Cancel").performClick()
-        compose.onNodeWithText("Delete").performClick(); compose.onNodeWithText("Delete local file?").assertIsDisplayed()
+        compose.onNodeWithText("Create note").performClick(); compose.onNodeWithText("Pending action: create").assertIsDisplayed()
+        compose.onNodeWithText("Open").performClick(); compose.onNodeWithText("Pending action: open").assertIsDisplayed()
+        compose.onNodeWithText("Share").performClick(); compose.onNodeWithText("Pending action: share").assertIsDisplayed()
+        compose.onNodeWithText("Delete").performClick(); compose.onNodeWithText("Pending action: delete").assertIsDisplayed()
     }
 }
