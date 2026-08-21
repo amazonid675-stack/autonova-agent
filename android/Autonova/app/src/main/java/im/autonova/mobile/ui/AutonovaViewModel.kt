@@ -97,6 +97,8 @@ class AutonovaViewModel(application: Application) : AndroidViewModel(application
     }
     fun importLocalModel(uri: Uri) = viewModelScope.launch { _feedback.value = MobileFeedback("Importing local model…", FeedbackTone.INFO, true); _feedback.value = localModel.importModel(uri).fold({ MobileFeedback(it, FeedbackTone.SUCCESS) }, { MobileFeedback(it.message ?: "Could not import the local model.", FeedbackTone.ERROR) }) }
     fun localModelStatus(): String = localModel.status()
+    fun localModelStorageBytes(): Long = localModel.storageBytes()
+    fun removeLocalModel() = viewModelScope.launch { _feedback.value = localModel.removeImportedModel().fold({ MobileFeedback(it, FeedbackTone.SUCCESS) }, { MobileFeedback(it.message ?: "Could not remove the local model.", FeedbackTone.ERROR) }) }
     fun runLocalModel(prompt: String) = viewModelScope.launch { _feedback.value = MobileFeedback("Running the local model…", FeedbackTone.INFO, true); _feedback.value = localModel.generate(prompt).fold({ answer -> repository.appendLocalMessage(im.autonova.mobile.data.ChatMessage("local-model-${System.currentTimeMillis()}", "assistant", answer, System.currentTimeMillis())); MobileFeedback("Local model response added to your workspace.", FeedbackTone.SUCCESS) }, { _pendingCloudFallback.value = prompt; MobileFeedback("Local model could not run. You can choose a connected cloud fallback without retyping your request.", FeedbackTone.ERROR) }) }
     fun confirmCloudFallback() { val prompt = _pendingCloudFallback.value ?: return; _pendingCloudFallback.value = null; submit("Use the connected cloud agent because local inference is unavailable. Original request:\n$prompt") }
     fun dismissCloudFallback() { _pendingCloudFallback.value = null }
