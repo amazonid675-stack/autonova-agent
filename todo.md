@@ -97,7 +97,7 @@
 - [x] Implement the strongest Android-safe local project/code workspace and authorized Git workflow, documenting platform limits for sandboxed code execution and limiting sync to confirmation-gated selected text-file writes rather than unrestricted local Git.
 - [x] Expand automated offline, concrete network/provider failure, permission, recovery, memory, task, and GitHub regression coverage and align GitHub Actions with the documented test matrix.
 - [x] Create and maintain the required architecture, offline, online, models, tools, memory, learning, GitHub, security, testing, troubleshooting, changelog, and final capability-reconciliation documentation.
-- [ ] Validate the new local-first Android release on an emulator, checkpoint it, and deliver a revised APK with the completed PDF reconciliation.
+- [x] Validate the new local-first Android release on an emulator, checkpoint it, and deliver a revised APK with the completed PDF reconciliation.
 - [x] Add storage-management controls for model, project, document-index, cache, copy/export/archive, and separate confirmed deletion, with user-visible privacy and provider disclosure before external transmission; document that arbitrary atomic moves remain provider-dependent and unsupported.
 - [x] Extend the scoped Android workspace with local file editing/search and the strongest supported authorized Git synchronization flow, keeping unsupported shell execution explicit.
 - [x] Add failure-path regression coverage for no model, permission denial, concrete provider/network loss, task restart recovery, and GitHub authorization or conflict handling, and wire the expanded suite into CI.
@@ -114,4 +114,4 @@
 - [x] Expose task observation, tool approval, repair, and escalation through the authenticated mobile API and Android UI, with persisted execution and verification evidence.
 - [x] Require distinct test-outcome and benchmark-comparison values for every improvement review record and update learning/audit documentation to reflect the implemented controls.
 - [x] Add a confirmation-gated GitHub workspace-file write operation that uploads only text explicitly selected from the Android scoped workspace and records conflict outcomes.
-- [ ] Add a confirmation-gated GitHub workspace-file write operation that uploads only text explicitly selected from the Android scoped workspace and records conflict outcomes.
+- [x] Add a confirmation-gated GitHub workspace-file write operation that uploads only text explicitly selected from the Android scoped workspace and records conflict outcomes.
