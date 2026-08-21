@@ -28,7 +28,7 @@ const learningCandidateSchema = z.object({ title: z.string().trim().min(1).max(2
 const learningDecisionSchema = z.object({ status: z.enum(["APPROVED", "DISMISSED"]), title: z.string().trim().min(1).max(200).optional(), content: z.string().trim().min(1).max(12000).optional(), layer: z.enum(["TASK", "PROJECT", "PERSONAL", "DOCUMENT"]).optional() });
 const capabilityGrantSchema = z.object({ capability: z.string().trim().regex(/^[a-z0-9_.-]{2,100}$/i), scope: z.string().trim().min(1).max(4000), rationale: z.string().trim().max(2000).optional(), expiresAt: z.string().datetime().optional() });
 const capabilityGrantDecisionSchema = z.object({ status: z.enum(["APPROVED", "DECLINED", "REVOKED"]) });
-const deviceAuditSchema = z.object({ capability: z.string().trim().regex(/^[a-z0-9_.-]{2,100}$/i), scope: z.string().trim().min(1).max(4000), detail: z.string().trim().min(1).max(2000), outcome: z.enum(["APPROVED", "COMPLETED", "FAILED", "REVOKED"]) });
+export const deviceAuditSchema = z.object({ capability: z.string().trim().regex(/^[a-z0-9_.-]{2,100}$/i), scope: z.string().trim().min(1).max(4000), detail: z.string().trim().min(1).max(2000), outcome: z.enum(["APPROVED", "COMPLETED", "FAILED", "REVOKED"]) });
 const githubConnectionSchema = z.object({ token: z.string().trim().min(20).max(4000), scopes: z.string().trim().min(1).max(1000) });
 export const githubOperationSchema = z.object({ repository: githubRepositorySchema, operation: z.enum(["CREATE_ISSUE", "CREATE_BRANCH", "CREATE_PULL_REQUEST"]), title: z.string().trim().min(1).max(240).optional(), body: z.string().trim().max(6000).optional(), branch: z.string().trim().regex(/^[A-Za-z0-9._/-]{1,120}$/).optional(), fromBranch: z.string().trim().regex(/^[A-Za-z0-9._/-]{1,120}$/).optional(), head: z.string().trim().regex(/^[A-Za-z0-9._/-]{1,160}$/).optional(), base: z.string().trim().regex(/^[A-Za-z0-9._/-]{1,120}$/).optional() }).superRefine((value, context) => {
   if (value.operation === "CREATE_ISSUE" && !value.title) context.addIssue({ code: z.ZodIssueCode.custom, message: "Issue title is required." });
@@ -107,6 +107,16 @@ async function summarizeResearch(query: string, sources: Array<{ citationLabel: 
   const content = response.choices[0]?.message.content;
   if (typeof content !== "string" || !content.trim()) throw new Error("The research model returned no usable summary.");
   return { summary: content.trim(), usage: response.usage };
+}
+
+/** Stores a device-side consent outcome as the same server-side grant model used by research and GitHub operations. */
+export async function persistDeviceAudit(userId: number, input: z.infer<typeof deviceAuditSchema>) {
+  const status = input.outcome === "REVOKED" ? "REVOKED" as const : "APPROVED" as const;
+  const grant = await db.createCapabilityGrant(userId, { capability: input.capability, scope: input.scope, rationale: input.detail, outcome: input.outcome });
+  if (!grant) return null;
+  await db.updateCapabilityGrant(userId, grant.id, status, input.outcome);
+  await db.createActivity(userId, { eventType: "DEVICE_CAPABILITY_AUDIT", title: `${input.capability} ${input.outcome.toLowerCase()}`, detail: input.detail, visibility: "STANDARD" });
+  return { id: grant.id, capability: grant.capability, scope: grant.scope, status, outcome: input.outcome };
 }
 
 export function registerMobileApi(app: Express) {
@@ -318,12 +328,9 @@ export function registerMobileApi(app: Express) {
   app.post("/api/mobile/device-audit", async (req, res) => {
     const ctx = await requireMobileUser(req, res); if (!ctx) return res.status(401).json({ error: "Authentication required" });
     const parsed = deviceAuditSchema.safeParse(req.body); if (!parsed.success) return res.status(400).json({ error: "Invalid device capability audit record." });
-    const status = parsed.data.outcome === "REVOKED" ? "REVOKED" : "APPROVED" as const;
-    const grant = await db.createCapabilityGrant(ctx.user.id, { capability: parsed.data.capability, scope: parsed.data.scope, rationale: parsed.data.detail, outcome: parsed.data.outcome });
-    if (!grant) return res.status(503).json({ error: "Capability audit storage is unavailable." });
-    await db.updateCapabilityGrant(ctx.user.id, grant.id, status, parsed.data.outcome);
-    await db.createActivity(ctx.user.id, { eventType: "DEVICE_CAPABILITY_AUDIT", title: `${parsed.data.capability} ${parsed.data.outcome.toLowerCase()}`, detail: parsed.data.detail, visibility: "STANDARD" });
-    return res.status(201).json({ id: grant.id, capability: grant.capability, scope: grant.scope, status, outcome: parsed.data.outcome });
+    const audit = await persistDeviceAudit(ctx.user.id, parsed.data);
+    if (!audit) return res.status(503).json({ error: "Capability audit storage is unavailable." });
+    return res.status(201).json(audit);
   });
   app.post("/api/mobile/github/connection", async (req, res) => {
     const ctx = await requireMobileUser(req, res); if (!ctx) return res.status(401).json({ error: "Authentication required" });

@@ -15,6 +15,7 @@ import kotlinx.coroutines.launch
 /** Keeps protected backend access, encrypted configuration, and Room cache updates out of Compose UI. */
 class AgentRepository(private val context: Context, private val cache: AgentCacheDao, private val config: SecureConfig) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val deviceAuditSynchronizer = DeviceAuditSynchronizer(cache)
     private val _messages = MutableStateFlow<List<ChatMessage>>(emptyList()); private val _tasks = MutableStateFlow<List<AgentTask>>(emptyList()); private val _projects = MutableStateFlow<List<AgentProject>>(emptyList())
     private val _memories = MutableStateFlow<List<MemoryItem>>(emptyList()); private val _activity = MutableStateFlow<List<ActivityItem>>(emptyList())
     private val _files = MutableStateFlow<List<FileItem>>(emptyList()); private val _tools = MutableStateFlow<List<ToolItem>>(emptyList()); private val _provider = MutableStateFlow<ProviderItem?>(null)
@@ -25,7 +26,11 @@ class AgentRepository(private val context: Context, private val cache: AgentCach
     fun createLocalTask(request: String) { val now = System.currentTimeMillis(); scope.launch { cache.upsertTasks(listOf(CachedTask("local-$now", request, TaskStatus.PLANNING.name, now))) } }
     fun appendLocalMessage(message: ChatMessage) { scope.launch { cache.upsertMessage(CachedMessage(message.id, message.role, message.content, message.createdAt)) } }
     fun recordLocalActivity(eventType: String, title: String, detail: String) { val now = System.currentTimeMillis(); scope.launch { cache.upsertActivity(listOf(CachedActivity("local-audit-$now", title, detail, eventType))) } }
-    suspend fun recordDeviceCapability(capability: String, scopeValue: String, detail: String, outcome: String): Boolean = runCatching { val now = System.currentTimeMillis(); cache.upsertCapabilityGrants(listOf(CachedCapabilityGrant("local-grant-$now", capability, scopeValue, detail, outcome, "", outcome))); cache.upsertActivity(listOf(CachedActivity("local-audit-$now", "$capability $outcome", detail, "CAPABILITY_AUDIT"))); api()?.recordDeviceAudit(capability, scopeValue, detail, outcome); refresh(); true }.getOrDefault(false)
+    suspend fun recordDeviceCapability(capability: String, scopeValue: String, detail: String, outcome: String): Boolean = runCatching {
+        val remoteAudit = api()?.let { client -> DeviceAuditRemote { event -> client.recordDeviceAudit(event.capability, event.scope, event.detail, event.outcome) } }
+        if (!deviceAuditSynchronizer.record(DeviceAuditEvent(capability, scopeValue, detail, outcome), remoteAudit)) return false
+        refresh(); true
+    }.getOrDefault(false)
     private fun api(): MobileAgentApi? = config.accessToken()?.let { MobileAgentApi(config.apiBaseUrl(), it) }
     suspend fun refresh(): Boolean {
         val api = api() ?: return false

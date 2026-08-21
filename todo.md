@@ -73,12 +73,14 @@
 - [x] Add configurable, consent-driven background agent work with clear schedules, network/battery constraints, notification outcomes, and pause controls.
 - [x] Extend offline assistance around a user-supplied on-device model, with transparent capability status and graceful cloud fallback.
 - [x] Add explicit permission, consent, audit, and revoke controls for all sensitive device, web, GitHub, storage, and background actions.
-- [ ] Add targeted Android and backend automated coverage for the newly added autonomy capabilities and validate a revised APK on an emulator.
+- [x] Add targeted Android and backend automated coverage for the newly added autonomy capabilities and validate a revised APK on an emulator.
 - [ ] Checkpoint and deliver the expanded Android APK with a complete capability reconciliation.
 - [x] Add a user-configurable background network policy plus visible background-review outcome history and notifications.
 - [x] Add an integrated local-model fallback choice that can route an unavailable or failed local request to the connected cloud agent only after user confirmation.
 - [x] Unify persisted consent, audit, and revoke records across browser handoff, clipboard intake, local storage actions, research, GitHub operations, and background work.
 - [x] Add a single persisted consent/audit model that records approval, scope, outcome, and revoke status for browser handoff, clipboard import, storage actions, research runs, GitHub operations, and background work.
 - [x] Link device-side approved actions to the same consent/grant records used by research and GitHub flows rather than only writing generic activity entries.
-- [ ] Add a protected mobile API path that persists browser, clipboard, storage, and background approvals into server-side capability grants with scope, outcome, and revoke status.
-- [ ] Link Android device-action recording and background outcomes to the protected consent-grant API while retaining the offline Room audit cache.
+- [x] Add a protected mobile API path that persists browser, clipboard, storage, and background approvals into server-side capability grants with scope, outcome, and revoke status.
+- [x] Link Android device-action recording and background outcomes to the protected consent-grant API while retaining the offline Room audit cache.
+- [ ] Add backend automated tests for the protected device-audit endpoint, including approved, completed, failed, and revoked capability-grant persistence semantics.
+- [ ] Add Android automated coverage for device-action and background-review consent synchronization while preserving the offline Room audit cache.
