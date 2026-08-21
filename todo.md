@@ -74,7 +74,7 @@
 - [x] Extend offline assistance around a user-supplied on-device model, with transparent capability status and graceful cloud fallback.
 - [x] Add explicit permission, consent, audit, and revoke controls for all sensitive device, web, GitHub, storage, and background actions.
 - [x] Add targeted Android and backend automated coverage for the newly added autonomy capabilities and validate a revised APK on an emulator.
-- [ ] Checkpoint and deliver the expanded Android APK with a complete capability reconciliation.
+- [x] Checkpoint and deliver the expanded Android APK with a complete capability reconciliation.
 - [x] Add a user-configurable background network policy plus visible background-review outcome history and notifications.
 - [x] Add an integrated local-model fallback choice that can route an unavailable or failed local request to the connected cloud agent only after user confirmation.
 - [x] Unify persisted consent, audit, and revoke records across browser handoff, clipboard intake, local storage actions, research, GitHub operations, and background work.
@@ -85,3 +85,4 @@
 - [x] Add backend automated tests for the protected device-audit endpoint, including approved, completed, failed, and revoked capability-grant persistence semantics.
 - [x] Add Android automated coverage for device-action and background-review consent synchronization while preserving the offline Room audit cache.
 - [x] Add backend route-level tests for the protected device-audit endpoint, covering authentication, validation, success outcomes, and unavailable storage.
+- [x] Deliver the expanded Android APK and final web checkpoint attachment with installation guidance and a capability-reconciliation summary.
