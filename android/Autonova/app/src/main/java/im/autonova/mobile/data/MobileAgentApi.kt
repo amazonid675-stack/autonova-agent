@@ -101,6 +101,10 @@ internal fun decodeStreamEvent(data: String): MobileStreamEvent? {
 }
 
 internal fun bearerAuthorizationValue(accessToken: String): String = "Bearer $accessToken"
+fun remoteRecoveryGuidance(failure: Throwable? = null): String {
+    val detail = failure?.message.orEmpty().lowercase()
+    return if (detail.contains("401") || detail.contains("403") || detail.contains("unauthorized")) "The remote agent rejected access. Reconnect the optional remote agent and retry, or continue with Local Only capabilities." else "The optional remote agent is unavailable. Check your network or endpoint, retry the action, or continue with Local Only capabilities."
+}
 
 class MobileAgentApi(private val baseUrl: String, private val accessToken: String) {
     private val client = HttpClient(OkHttp) { install(ContentNegotiation) { json(Json { ignoreUnknownKeys = true }) } }

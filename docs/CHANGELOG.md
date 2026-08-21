@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.6.1 — Remote recovery coverage patch
+
+- Added explicit remote-provider authorization and network recovery guidance that directs the owner to retry the selected endpoint or continue with Local Only capabilities.
+- Added Android unit and emulator instrumentation regressions for an unreachable Optional Remote Agent, alongside the existing no-model, permission-denial, Room recovery, and GitHub conflict coverage.
+
 ## 0.6.0 — Evidence-led local-first agent operations
 
 - Added durable task-evidence records plus Android task controls for observations, consent-aware tool selection and approval, repair, escalation, and evidence-backed verification.
