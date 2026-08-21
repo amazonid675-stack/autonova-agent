@@ -170,8 +170,21 @@ export const agentRouter = router({
         await db.createActivity(ctx.user.id, { taskId: task.id, eventType: "VERIFYING", title: "Task entered verification", detail: "All planned steps are complete; result review is ready." });
         return { status: "VERIFYING" as const };
       }
-      if (task.status === "VERIFYING") { await db.updateTask(ctx.user.id, task.id, { status: "COMPLETED", completedAt: new Date(), finalResult: "Execution plan completed and verified by the workspace workflow." }); await db.createActivity(ctx.user.id, { taskId: task.id, eventType: "TASK_COMPLETED", title: "Task completed", detail: "The workflow completed after verification." }); return { status: "COMPLETED" as const }; }
+      if (task.status === "VERIFYING") throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Record verification evidence before completing this task." });
       throw new TRPCError({ code: "BAD_REQUEST", message: "This task cannot be advanced from its current state." });
+    }),
+    verify: protectedProcedure.input(z.object({ taskId: z.number().int().positive(), passed: z.boolean(), evidence: z.string().trim().min(3).max(2000), nextAction: z.string().trim().min(3).max(400).optional() })).mutation(async ({ ctx, input }) => {
+      const task = requireRecord(await db.getTask(ctx.user.id, input.taskId));
+      if (task.status !== "VERIFYING") throw new TRPCError({ code: "BAD_REQUEST", message: "Only a task awaiting verification evidence can be verified." });
+      const evidence = redactSecrets(input.evidence);
+      if (input.passed) {
+        await db.updateTask(ctx.user.id, task.id, { status: "COMPLETED", completedAt: new Date(), finalResult: evidence });
+        await db.createActivity(ctx.user.id, { taskId: task.id, eventType: "TASK_VERIFIED", title: "Verification passed", detail: evidence, visibility: "ADVANCED" });
+        return { status: "COMPLETED" as const };
+      }
+      await db.updateTask(ctx.user.id, task.id, { status: "FAILED", errorSummary: evidence });
+      await db.createActivity(ctx.user.id, { taskId: task.id, eventType: "TASK_VERIFICATION_FAILED", title: "Verification failed", detail: `${evidence}${input.nextAction ? ` Next action: ${redactSecrets(input.nextAction)}` : ""}`, visibility: "ADVANCED" });
+      return { status: "FAILED" as const };
     }),
     fail: protectedProcedure.input(z.object({ taskId: z.number().int().positive(), summary: z.string().trim().min(3).max(500) })).mutation(async ({ ctx, input }) => {
       requireRecord(await db.getTask(ctx.user.id, input.taskId));
