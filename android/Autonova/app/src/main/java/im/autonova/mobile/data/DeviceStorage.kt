@@ -16,6 +16,11 @@ class DeviceStorage(private val context: Context, private val config: SecureConf
         config.saveStorageTree(uri.toString())
     }
 
+    fun clearTree() {
+        config.storageTree()?.let { value -> runCatching { context.contentResolver.releasePersistableUriPermission(Uri.parse(value), Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION) } }
+        config.clearStorageTree()
+    }
+
     fun hasFolder(): Boolean = root()?.canRead() == true
 
     fun listFiles(): List<LocalDocument> = root()?.listFiles()?.filter { it.isFile }?.map { file ->

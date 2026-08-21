@@ -1,0 +1,1 @@
+ALTER TABLE `capabilityGrants` ADD `outcome` text;

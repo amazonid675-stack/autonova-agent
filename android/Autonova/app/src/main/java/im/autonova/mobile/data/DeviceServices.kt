@@ -79,6 +79,12 @@ class AgentNotifier(private val context: Context) {
         val title = if (status == "COMPLETED") "Autonova task completed" else "Autonova task needs attention"
         NotificationManagerCompat.from(context).notify(taskId.hashCode(), NotificationCompat.Builder(context, CHANNEL).setSmallIcon(android.R.drawable.stat_notify_more).setContentTitle(title).setContentText(request.take(120)).setAutoCancel(true).build())
     }
+    fun notifyBackgroundReview(success: Boolean, detail: String) {
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return
+        createChannel()
+        val title = if (success) "Autonova background review finished" else "Autonova background review needs attention"
+        NotificationManagerCompat.from(context).notify("background-review".hashCode(), NotificationCompat.Builder(context, CHANNEL).setSmallIcon(android.R.drawable.stat_notify_more).setContentTitle(title).setContentText(detail.take(120)).setAutoCancel(true).build())
+    }
     companion object { const val CHANNEL = "autonova-task-updates" }
 }
 

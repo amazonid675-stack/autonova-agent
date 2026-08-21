@@ -25,6 +25,18 @@ class SecureConfig(private val context: Context) {
     fun clearLocalModel() = prefs.edit().remove("local_model_path").apply()
     fun setNotificationsEnabled(enabled: Boolean) = prefs.edit().putBoolean("notifications_enabled", enabled).apply()
     fun notificationsEnabled(): Boolean = prefs.getBoolean("notifications_enabled", false)
+    fun setBackgroundSyncEnabled(enabled: Boolean) = prefs.edit().putBoolean("background_sync_enabled", enabled).apply()
+    fun backgroundSyncEnabled(): Boolean = prefs.getBoolean("background_sync_enabled", true)
+    fun setBackgroundRequiresCharging(enabled: Boolean) = prefs.edit().putBoolean("background_requires_charging", enabled).apply()
+    fun backgroundRequiresCharging(): Boolean = prefs.getBoolean("background_requires_charging", false)
+    fun setBackgroundRequiresUnmeteredNetwork(enabled: Boolean) = prefs.edit().putBoolean("background_requires_unmetered", enabled).apply()
+    fun backgroundRequiresUnmeteredNetwork(): Boolean = prefs.getBoolean("background_requires_unmetered", false)
+    fun setBackgroundIntervalMinutes(minutes: Long) { require(minutes >= 15) { "Android background work requires at least a 15-minute interval." }; prefs.edit().putLong("background_interval_minutes", minutes).apply() }
+    fun backgroundIntervalMinutes(): Long = prefs.getLong("background_interval_minutes", 60L).coerceAtLeast(15L)
+    fun setLearningReviewEnabled(enabled: Boolean) = prefs.edit().putBoolean("learning_review_enabled", enabled).apply()
+    fun learningReviewEnabled(): Boolean = prefs.getBoolean("learning_review_enabled", false)
+    fun hasLearningFingerprint(fingerprint: String): Boolean = prefs.getStringSet("learning_fingerprints", emptySet())?.contains(fingerprint) == true
+    fun markLearningFingerprint(fingerprint: String) { val current = (prefs.getStringSet("learning_fingerprints", emptySet()) ?: emptySet()).toMutableSet(); current.add(fingerprint); while (current.size > 80) current.remove(current.first()); prefs.edit().putStringSet("learning_fingerprints", current).apply() }
     private fun contextFilesPrefix(): String = context.filesDir.absolutePath
     fun isConfigured(): Boolean = accessToken() != null
     fun clearSession() = prefs.edit().remove("access_token").remove("session_cookie").remove("code_verifier").apply()

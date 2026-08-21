@@ -176,6 +176,83 @@ export const mobileAuthGrants = mysqlTable("mobileAuthGrants", {
   codeHashUnique: uniqueIndex("mobile_auth_grants_code_hash_unique").on(table.codeHash),
 }));
 
+export const researchSessions = mysqlTable("researchSessions", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
+  capabilityGrantId: int("capabilityGrantId").references(() => capabilityGrants.id, { onDelete: "set null" }),
+  query: varchar("query", { length: 600 }).notNull(),
+  status: mysqlEnum("status", ["DRAFT", "RUNNING", "COMPLETED", "FAILED"]).default("DRAFT").notNull(),
+  summary: text("summary"),
+  errorSummary: text("errorSummary"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export const researchSources = mysqlTable("researchSources", {
+  id: int("id").autoincrement().primaryKey(),
+  sessionId: int("sessionId").notNull().references(() => researchSessions.id, { onDelete: "cascade" }),
+  userId: int("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
+  sourceUrl: varchar("sourceUrl", { length: 2048 }).notNull(),
+  host: varchar("host", { length: 255 }).notNull(),
+  title: varchar("title", { length: 500 }),
+  excerpt: text("excerpt"),
+  citationLabel: varchar("citationLabel", { length: 32 }).notNull(),
+  fetchStatus: mysqlEnum("fetchStatus", ["PENDING", "FETCHED", "REJECTED", "FAILED"]).default("PENDING").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export const learningCandidates = mysqlTable("learningCandidates", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
+  title: varchar("title", { length: 200 }).notNull(),
+  content: text("content").notNull(),
+  layer: mysqlEnum("layer", ["TASK", "PROJECT", "PERSONAL", "DOCUMENT"]).default("PERSONAL").notNull(),
+  source: varchar("source", { length: 160 }).default("ANDROID_LOCAL").notNull(),
+  status: mysqlEnum("status", ["PENDING", "APPROVED", "DISMISSED"]).default("PENDING").notNull(),
+  memoryId: int("memoryId").references(() => memories.id, { onDelete: "set null" }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export const capabilityGrants = mysqlTable("capabilityGrants", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
+  capability: varchar("capability", { length: 100 }).notNull(),
+  scope: text("scope").notNull(),
+  rationale: text("rationale"),
+  outcome: text("outcome"),
+  status: mysqlEnum("status", ["PENDING", "APPROVED", "DECLINED", "REVOKED"]).default("PENDING").notNull(),
+  expiresAt: timestamp("expiresAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export const githubConnections = mysqlTable("githubConnections", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
+  login: varchar("login", { length: 160 }).notNull(),
+  encryptedToken: text("encryptedToken").notNull(),
+  scopes: varchar("scopes", { length: 1000 }).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, table => ({
+  userConnectionUnique: uniqueIndex("github_connections_user_unique").on(table.userId),
+}));
+
+export const githubOperationRequests = mysqlTable("githubOperationRequests", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
+  capabilityGrantId: int("capabilityGrantId").references(() => capabilityGrants.id, { onDelete: "set null" }),
+  repository: varchar("repository", { length: 255 }).notNull(),
+  operation: mysqlEnum("operation", ["CREATE_ISSUE", "CREATE_BRANCH", "CREATE_PULL_REQUEST"]).notNull(),
+  payload: text("payload").notNull(),
+  status: mysqlEnum("status", ["PENDING", "APPROVED", "COMPLETED", "FAILED", "CANCELLED"]).default("PENDING").notNull(),
+  resultSummary: text("resultSummary"),
+  errorSummary: text("errorSummary"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 export type Project = typeof projects.$inferSelect;

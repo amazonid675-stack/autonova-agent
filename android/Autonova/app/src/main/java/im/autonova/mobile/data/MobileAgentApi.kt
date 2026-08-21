@@ -31,7 +31,13 @@ import kotlinx.serialization.json.jsonPrimitive
 @Serializable data class MobileFileWire(val id: Int, val name: String, val mimeType: String, val sizeBytes: Int)
 @Serializable data class MobileToolWire(val toolKey: String, val policy: String)
 @Serializable data class MobileProviderWire(val name: String, val providerType: String, val activeModel: String? = null, val costMode: String, val hasApiKey: Boolean)
-@Serializable data class MobileBootstrap(val projects: List<MobileProjectWire>, val tasks: List<MobileTaskWire>, val memories: List<MobileMemoryWire>, val activity: List<MobileActivityWire>, val files: List<MobileFileWire> = emptyList(), val toolPermissions: List<MobileToolWire> = emptyList(), val provider: MobileProviderWire? = null)
+@Serializable data class MobileResearchWire(val id: Int, val query: String, val status: String, val summary: String? = null, val errorSummary: String? = null)
+@Serializable data class MobileResearchSourceWire(val id: Int, val sessionId: Int, val sourceUrl: String, val host: String, val title: String? = null, val excerpt: String? = null, val citationLabel: String, val fetchStatus: String)
+@Serializable data class MobileLearningCandidateWire(val id: Int, val title: String, val content: String, val layer: String, val source: String, val status: String)
+@Serializable data class MobileCapabilityGrantWire(val id: Int, val capability: String, val scope: String, val rationale: String? = null, val outcome: String? = null, val status: String, val expiresAt: String? = null)
+@Serializable data class MobileGitHubConnectionWire(val login: String, val scopes: String)
+@Serializable data class MobileGitHubOperationWire(val id: Int, val repository: String, val operation: String, val status: String, val resultSummary: String? = null, val errorSummary: String? = null)
+@Serializable data class MobileBootstrap(val projects: List<MobileProjectWire>, val tasks: List<MobileTaskWire>, val memories: List<MobileMemoryWire>, val activity: List<MobileActivityWire>, val files: List<MobileFileWire> = emptyList(), val toolPermissions: List<MobileToolWire> = emptyList(), val provider: MobileProviderWire? = null, val research: List<MobileResearchWire> = emptyList(), val learningCandidates: List<MobileLearningCandidateWire> = emptyList(), val capabilityGrants: List<MobileCapabilityGrantWire> = emptyList(), val githubConnection: MobileGitHubConnectionWire? = null, val githubOperations: List<MobileGitHubOperationWire> = emptyList())
 @Serializable data class DeviceRegistration(val deviceId: String, val label: String, val pushEnabled: Boolean)
 @Serializable data class StreamRequest(val content: String)
 @Serializable data class ProjectRequest(val name: String, val description: String? = null)
@@ -43,6 +49,16 @@ import kotlinx.serialization.json.jsonPrimitive
 @Serializable data class ProviderRequest(val name: String, val providerType: String, val baseUrl: String? = null, val activeModel: String? = null, val apiKey: String? = null, val costMode: String = "BALANCED")
 @Serializable data class ImageRequest(val prompt: String)
 @Serializable data class GeneratedImageWire(val url: String)
+@Serializable data class ResearchRequest(val query: String, val sources: List<String>)
+@Serializable data class ResearchResultWire(val session: MobileResearchWire? = null, val sources: List<MobileResearchSourceWire> = emptyList())
+@Serializable data class LearningCandidateRequest(val title: String, val content: String, val layer: String = "PERSONAL", val source: String = "ANDROID_LOCAL")
+@Serializable data class LearningDecisionRequest(val status: String, val title: String? = null, val content: String? = null, val layer: String? = null)
+@Serializable data class CapabilityGrantRequest(val capability: String, val scope: String, val rationale: String? = null, val expiresAt: String? = null)
+@Serializable data class CapabilityGrantDecisionRequest(val status: String)
+@Serializable data class DeviceAuditRequest(val capability: String, val scope: String, val detail: String, val outcome: String)
+@Serializable data class GitHubConnectionRequest(val token: String, val scopes: String)
+@Serializable data class GitHubOperationRequest(val repository: String, val operation: String, val title: String? = null, val body: String? = null, val branch: String? = null, val fromBranch: String? = null, val head: String? = null, val base: String? = null)
+@Serializable data class GitHubOperationResultWire(val resultSummary: String)
 @Serializable data class UsageTotalsWire(val inputTokens: Int, val outputTokens: Int, val toolCalls: Int, val estimatedCostMicros: Int)
 @Serializable data class UsageRecordWire(val id: Int, val model: String, val inputTokens: Int, val outputTokens: Int, val toolCalls: Int, val estimatedCostMicros: Int)
 @Serializable data class UsageWire(val totals: UsageTotalsWire, val records: List<UsageRecordWire>)
@@ -94,6 +110,17 @@ class MobileAgentApi(private val baseUrl: String, private val accessToken: Strin
     suspend fun usage(): UsageWire = client.get(path("/api/mobile/usage")) { header(authorized().first, authorized().second) }.body()
     suspend fun generateImage(prompt: String): GeneratedImageWire { val response = client.post(path("/api/mobile/images")) { header(authorized().first, authorized().second); contentType(ContentType.Application.Json); setBody(ImageRequest(prompt)) }; requireSuccess(response); return response.body() }
     suspend fun inspectGitHub(repository: String): GitHubInspectionWire = client.get(path("/api/mobile/github?repository=$repository")) { header(authorized().first, authorized().second) }.body()
+    suspend fun research(query: String, sources: List<String>): ResearchResultWire { val response = client.post(path("/api/mobile/research")) { header(authorized().first, authorized().second); contentType(ContentType.Application.Json); setBody(ResearchRequest(query, sources)) }; requireSuccess(response); return response.body() }
+    suspend fun createLearningCandidate(input: LearningCandidateRequest): MobileLearningCandidateWire { val response = client.post(path("/api/mobile/learning-candidates")) { header(authorized().first, authorized().second); contentType(ContentType.Application.Json); setBody(input) }; requireSuccess(response); return response.body() }
+    suspend fun reviewLearningCandidate(id: String, input: LearningDecisionRequest) { requireSuccess(client.put(path("/api/mobile/learning-candidates/$id")) { header(authorized().first, authorized().second); contentType(ContentType.Application.Json); setBody(input) }) }
+    suspend fun createCapabilityGrant(input: CapabilityGrantRequest): MobileCapabilityGrantWire { val response = client.post(path("/api/mobile/capability-grants")) { header(authorized().first, authorized().second); contentType(ContentType.Application.Json); setBody(input) }; requireSuccess(response); return response.body() }
+    suspend fun updateCapabilityGrant(id: String, status: String) { requireSuccess(client.put(path("/api/mobile/capability-grants/$id")) { header(authorized().first, authorized().second); contentType(ContentType.Application.Json); setBody(CapabilityGrantDecisionRequest(status)) }) }
+    suspend fun recordDeviceAudit(capability: String, scope: String, detail: String, outcome: String) { requireSuccess(client.post(path("/api/mobile/device-audit")) { header(authorized().first, authorized().second); contentType(ContentType.Application.Json); setBody(DeviceAuditRequest(capability, scope, detail, outcome)) }) }
+    suspend fun connectGitHub(token: String, scopes: String): MobileGitHubConnectionWire { val response = client.post(path("/api/mobile/github/connection")) { header(authorized().first, authorized().second); contentType(ContentType.Application.Json); setBody(GitHubConnectionRequest(token, scopes)) }; requireSuccess(response); return response.body() }
+    suspend fun disconnectGitHub() { requireSuccess(client.delete(path("/api/mobile/github/connection")) { header(authorized().first, authorized().second) }) }
+    suspend fun proposeGitHubOperation(input: GitHubOperationRequest): MobileGitHubOperationWire { val response = client.post(path("/api/mobile/github/operations")) { header(authorized().first, authorized().second); contentType(ContentType.Application.Json); setBody(input) }; requireSuccess(response); return response.body() }
+    suspend fun approveGitHubOperation(id: String): GitHubOperationResultWire { val response = client.post(path("/api/mobile/github/operations/$id/approve")) { header(authorized().first, authorized().second) }; requireSuccess(response); return response.body() }
+    suspend fun cancelGitHubOperation(id: String) { requireSuccess(client.post(path("/api/mobile/github/operations/$id/cancel")) { header(authorized().first, authorized().second) }) }
 
     suspend fun sendMessage(content: String, onSnapshot: suspend (String) -> Unit = {}): String? {
         val response = client.post(path("/api/agent/stream")) { header(authorized().first, authorized().second); contentType(ContentType.Application.Json); setBody(StreamRequest(content)) }

@@ -44,6 +44,25 @@ class NavigationTest {
         compose.onNodeWithText("On-device local model").assertIsDisplayed()
         compose.onNodeWithText("Browser handoff").performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("Sharing and clipboard").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Background learning review").performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("Safe automation").performScrollTo().assertIsDisplayed()
+    }
+
+    @Test fun more_menu_exposes_selected_source_research_and_reviewable_learning() {
+        compose.onNodeWithText("More").performClick()
+        compose.onNodeWithText("Research").performClick()
+        compose.onNodeWithText("Public HTTPS source URLs — one per line").assertIsDisplayed()
+        compose.onNodeWithText("Search web").assertIsDisplayed()
+        compose.onNodeWithText("Back").performClick()
+        compose.onNodeWithText("Learning & autonomy").performClick()
+        compose.onNodeWithText("Propose a memory").assertIsDisplayed()
+        compose.onNodeWithText("Capability grants").assertIsDisplayed()
+    }
+
+    @Test fun more_menu_exposes_github_confirmation_queue() {
+        compose.onNodeWithText("More").performClick()
+        compose.onNodeWithText("GitHub").performScrollTo().performClick()
+        compose.onNodeWithText("Connect GitHub").assertIsDisplayed()
+        compose.onNodeWithText("Fine-grained GitHub token").assertIsDisplayed()
     }
 }

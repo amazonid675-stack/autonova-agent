@@ -55,4 +55,22 @@ class SecureConfigInstrumentedTest {
         assertFalse(config.notificationsEnabled())
         try { config.saveLocalModelPath("/sdcard/unsafe.task"); fail("Non-private model path should be rejected") } catch (_: IllegalArgumentException) { }
     }
+
+    @Test fun encrypted_configuration_persists_user_controlled_background_review_constraints() {
+        val config = SecureConfig(ApplicationProvider.getApplicationContext())
+        config.setBackgroundSyncEnabled(true)
+        config.setBackgroundRequiresCharging(true)
+        config.setBackgroundRequiresUnmeteredNetwork(true)
+        config.setBackgroundIntervalMinutes(30)
+        config.setLearningReviewEnabled(true)
+        assertTrue(config.backgroundSyncEnabled())
+        assertTrue(config.backgroundRequiresCharging())
+        assertTrue(config.backgroundRequiresUnmeteredNetwork())
+        assertEquals(30L, config.backgroundIntervalMinutes())
+        assertTrue(config.learningReviewEnabled())
+        assertFalse(config.hasLearningFingerprint("candidate-1"))
+        config.markLearningFingerprint("candidate-1")
+        assertTrue(config.hasLearningFingerprint("candidate-1"))
+        try { config.setBackgroundIntervalMinutes(14); fail("Android background review must honor the 15-minute minimum") } catch (_: IllegalArgumentException) { }
+    }
 }

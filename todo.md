@@ -65,4 +65,20 @@
 - [x] Build, validate, and deliver a revised APK that includes the completed Android capability set.
 - [x] Make Android emulator CI install the app and test APKs explicitly, avoiding the runner's incorrect API-level detection during split-package installation.
 - [x] Add focused emulator UI evidence for the device-capability command center, including notifications, local model, browser handoff, sharing/clipboard, and safe automation boundaries.
-- [ ] Attach the final verified APK to the user with safe installation guidance.
+- [x] Attach the final verified APK to the user with safe installation guidance.
+- [x] Re-audit the source PDF and current Android implementation to classify every requested capability as implemented, implementable, platform-limited, or requiring user-provided credentials/models.
+- [x] Add a user-approved web-research capability that uses the device network through visible Android browser handoff or configured search service access.
+- [x] Add a user-approved GitHub capability path for repository context and authenticated GitHub operations without exposing credentials.
+- [x] Add durable user-controlled memory learning controls, including reviewable learning candidates, explicit retention choices, and background synchronization.
+- [x] Add configurable, consent-driven background agent work with clear schedules, network/battery constraints, notification outcomes, and pause controls.
+- [x] Extend offline assistance around a user-supplied on-device model, with transparent capability status and graceful cloud fallback.
+- [x] Add explicit permission, consent, audit, and revoke controls for all sensitive device, web, GitHub, storage, and background actions.
+- [ ] Add targeted Android and backend automated coverage for the newly added autonomy capabilities and validate a revised APK on an emulator.
+- [ ] Checkpoint and deliver the expanded Android APK with a complete capability reconciliation.
+- [x] Add a user-configurable background network policy plus visible background-review outcome history and notifications.
+- [x] Add an integrated local-model fallback choice that can route an unavailable or failed local request to the connected cloud agent only after user confirmation.
+- [x] Unify persisted consent, audit, and revoke records across browser handoff, clipboard intake, local storage actions, research, GitHub operations, and background work.
+- [x] Add a single persisted consent/audit model that records approval, scope, outcome, and revoke status for browser handoff, clipboard import, storage actions, research runs, GitHub operations, and background work.
+- [x] Link device-side approved actions to the same consent/grant records used by research and GitHub flows rather than only writing generic activity entries.
+- [ ] Add a protected mobile API path that persists browser, clipboard, storage, and background approvals into server-side capability grants with scope, outcome, and revoke status.
+- [ ] Link Android device-action recording and background outcomes to the protected consent-grant API while retaining the offline Room audit cache.
