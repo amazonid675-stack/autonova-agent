@@ -46,16 +46,16 @@ class AgentRepository(private val context: Context, private val cache: AgentCach
         if (config.notificationsEnabled()) snapshot.tasks.filter { it.status in listOf("COMPLETED", "FAILED") && previousStatuses[it.id.toString()] != it.status }.forEach { AgentNotifier(context).notifyTask(it.id.toString(), it.request, it.status) }
         return true
     }
-    suspend fun submit(text: String): Boolean {
-        val now = System.currentTimeMillis(); appendLocalMessage(ChatMessage("local-$now", "user", text, now)); val api = api()
-        if (api != null) { val assistantId = "agent-${System.currentTimeMillis()}"; val assistantCreatedAt = System.currentTimeMillis(); var receivedSnapshot = false; val result = runCatching { api.sendMessage(text) { snapshot -> if (snapshot.isNotBlank()) { receivedSnapshot = true; cache.upsertMessage(CachedMessage(assistantId, "assistant", snapshot, assistantCreatedAt)) } } }; if (result.isFailure) return false; val reply = result.getOrNull(); if (!receivedSnapshot && !reply.isNullOrBlank()) cache.upsertMessage(CachedMessage(assistantId, "assistant", reply, assistantCreatedAt)) }
+    suspend fun submit(text: String, forceRemote: Boolean = false): Boolean {
+        val now = System.currentTimeMillis(); appendLocalMessage(ChatMessage("local-$now", "user", text, now)); val api = if (forceRemote) api() else null
+        if (api != null) { val assistantId = "agent-${System.currentTimeMillis()}"; val assistantCreatedAt = System.currentTimeMillis(); var receivedSnapshot = false; val result = runCatching { api.sendMessage(text) { snapshot -> if (snapshot.isNotBlank()) { receivedSnapshot = true; cache.upsertMessage(CachedMessage(assistantId, "assistant", snapshot, assistantCreatedAt)) } } }; if (result.isFailure) return false; val reply = result.getOrNull(); if (!receivedSnapshot && !reply.isNullOrBlank()) cache.upsertMessage(CachedMessage(assistantId, "assistant", reply, assistantCreatedAt)); recordLocalActivity("MODEL_ROUTE", "Optional remote model selected", "The user explicitly approved remote fallback after local inference was unavailable.") }
         else {
             val memory = cache.localMemorySnippets().joinToString("\n") { "- ${it.title}: ${it.content.take(500)}" }
             val knowledge = localKnowledge.retrieve(text).joinToString("\n\n") { "[Local document: ${it.title}; lexical relevance ${it.score}]\n${it.excerpt}" }
             val prompt = buildString { append("You are Autonova running fully on this Android device. Be concise, honest about limitations, and do not claim network access or actions you did not perform."); if (memory.isNotBlank()) append("\n\nApproved local memory:\n$memory"); if (knowledge.isNotBlank()) append("\n\nLocal document evidence:\n$knowledge"); append("\n\nUser request:\n$text") }
             val response = localModel.generate(prompt).getOrElse { error -> "Offline request saved locally. A compatible on-device `.task` model is required for local reasoning. Import one in Device Capabilities, or explicitly choose Optional remote agent mode for online tools. Details: ${error.message ?: "local model unavailable"}" }
             appendLocalMessage(ChatMessage("local-model-${System.currentTimeMillis()}", "assistant", response, System.currentTimeMillis()))
-            recordLocalActivity("LOCAL_AGENT", "Local agent response", if (response.startsWith("Offline request saved")) "No compatible local model was available." else "Generated with the user-selected local model and local memory context.")
+            recordLocalActivity("MODEL_ROUTE", "Local model selected", if (response.startsWith("Offline request saved")) "No compatible local model was available." else "Generated with the user-selected local model, local memory, and local document evidence.")
         }
         if (text.lowercase().startsWith("build") || text.lowercase().startsWith("create") || text.lowercase().startsWith("research") || text.lowercase().startsWith("plan")) createLocalTask(text)
         return true

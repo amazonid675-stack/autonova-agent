@@ -1,5 +1,5 @@
 # Models
 
-Local inference accepts user-imported compatible quantized MediaPipe `.task` files and stores them in Android private storage. The model is invoked only when the local path exists; its response is clearly local. Compatibility, quality, RAM use, and capability depend on the model and device and cannot be inferred from a filename alone.
+Local inference accepts user-imported compatible quantized MediaPipe `.task` files and stores them in Android private storage. Ordinary Android chat is routed to this local path first, with local Room memory and local document evidence where available. The model is invoked only when the local path exists; its response is clearly local. Compatibility, quality, RAM use, and capability depend on the model and device and cannot be inferred from a filename alone.
 
-Remote model providers are optional. The hosted service supports built-in and OpenAI-compatible text providers with encrypted credentials. Image generation, vision, speech recognition, and text-to-speech remain provider or device dependent and must disclose that dependence in the UI.
+Remote model providers are optional. If local inference is unavailable, the app records that limitation and asks the user before sending the original request to a selected remote agent. The hosted service supports built-in and OpenAI-compatible text providers with encrypted credentials. Image generation, vision, speech recognition, and text-to-speech remain provider or device dependent and must disclose that dependence in the UI.

@@ -63,6 +63,7 @@ class LocalModelEngine(private val context: Context, private val config: SecureC
         "Local model imported (${destination.length() / (1024 * 1024)} MB)."
     } }
     fun status(): String = config.localModelPath()?.let { path -> if (File(path).isFile) "Imported local model: ${File(path).name}" else "Selected local model is no longer available." } ?: "No local model imported."
+    fun isAvailable(): Boolean = config.localModelPath()?.let { File(it).isFile } == true
     fun storageBytes(): Long = config.localModelPath()?.let { File(it).takeIf(File::isFile)?.length() } ?: 0L
     fun removeImportedModel(): Result<String> = runCatching { val path = config.localModelPath() ?: return@runCatching "No local model is selected."; val file = File(path); if (file.exists() && !file.delete()) error("The imported local model could not be removed."); config.clearLocalModel(); "Local model removed from private app storage." }
     suspend fun generate(prompt: String): Result<String> = withContext(Dispatchers.Default) { runCatching {
