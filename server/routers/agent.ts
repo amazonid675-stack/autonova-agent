@@ -8,12 +8,12 @@ import { assertSafeProviderUrl, decryptSecret, encryptSecret, redactSecrets } fr
 import { protectedProcedure, router } from "../_core/trpc";
 
 const toolDefinitions = [
-  { key: "web_search", label: "Web research", description: "Search and compare public web sources.", category: "Research", risk: "Low" },
-  { key: "github", label: "GitHub", description: "Read repository context and prepare proposed changes.", category: "Engineering", risk: "Medium" },
-  { key: "code_executor", label: "Code executor", description: "Run isolated code workflows after approval.", category: "Engineering", risk: "High" },
-  { key: "document_reader", label: "Document reader", description: "Read and reference uploaded document context.", category: "Knowledge", risk: "Low" },
-  { key: "image_generation", label: "Image studio", description: "Create or edit images from a directed prompt.", category: "Creative", risk: "Medium" },
-  { key: "http_request", label: "API request", description: "Call an approved API endpoint with scoped credentials.", category: "Connectivity", risk: "High" },
+  { key: "web_search", label: "Web research", description: "Search and compare public web sources.", category: "Research", risk: "Low", version: "1", inputSchema: "query, public HTTPS sources", outputSchema: "cited source summary", networkRequired: true, timeoutSeconds: 45, retryStrategy: "bounded source retry", auditPolicy: "record query and source URLs" },
+  { key: "github", label: "GitHub", description: "Read repository context and prepare confirmation-gated changes.", category: "Engineering", risk: "Medium", version: "1", inputSchema: "repository and proposed operation", outputSchema: "repository context or operation record", networkRequired: true, timeoutSeconds: 45, retryStrategy: "no automatic writes", auditPolicy: "record proposal, confirmation, and outcome" },
+  { key: "code_executor", label: "Code executor", description: "Describe isolated code workflows after approval; a general production sandbox is not yet exposed.", category: "Engineering", risk: "High", version: "1", inputSchema: "approved workspace action", outputSchema: "verified execution result or unavailable state", networkRequired: false, timeoutSeconds: 60, retryStrategy: "user-approved retry only", auditPolicy: "record plan, evidence, and failure" },
+  { key: "document_reader", label: "Document reader", description: "Read user-selected or uploaded document context.", category: "Knowledge", risk: "Low", version: "1", inputSchema: "authorized document reference", outputSchema: "excerpt with source label", networkRequired: false, timeoutSeconds: 30, retryStrategy: "no content retry without consent", auditPolicy: "record document reference, not sensitive content" },
+  { key: "image_generation", label: "Image studio", description: "Create images through a configured provider.", category: "Creative", risk: "Medium", version: "1", inputSchema: "image prompt", outputSchema: "provider-generated asset URL", networkRequired: true, timeoutSeconds: 90, retryStrategy: "one provider retry", auditPolicy: "record provider and generation outcome" },
+  { key: "http_request", label: "API request", description: "Call an approved API endpoint with scoped credentials.", category: "Connectivity", risk: "High", version: "1", inputSchema: "approved endpoint and request", outputSchema: "redacted response summary", networkRequired: true, timeoutSeconds: 30, retryStrategy: "idempotent requests only", auditPolicy: "record endpoint host and outcome without secrets" },
 ] as const;
 
 const taskPlanSchema = z.object({
