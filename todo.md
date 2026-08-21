@@ -86,3 +86,15 @@
 - [x] Add Android automated coverage for device-action and background-review consent synchronization while preserving the offline Room audit cache.
 - [x] Add backend route-level tests for the protected device-audit endpoint, covering authentication, validation, success outcomes, and unavailable storage.
 - [x] Deliver the expanded Android APK and final web checkpoint attachment with installation guidance and a capability-reconciliation summary.
+- [x] Produce a source-level PDF compliance audit that distinguishes verified behavior, partial behavior, UI-only claims, backend dependencies, offline limits, security findings, and a migration plan.
+- [x] Re-review the PDF compliance audit for explicit UI-only, simulated, and externally unverifiable areas before checkpointing the reconciliation.
+- [ ] Remove the packaged mandatory remote backend default and add explicit local-only, local-plus-internet, and optional remote-agent modes with secure user configuration.
+- [ ] Complete the local-first agent path for offline chat, persistent personal memory, document retrieval, queued work, and explicit unavailable-state feedback when no compatible local model is installed.
+- [ ] Implement a structured agent lifecycle with planning, tool selection, observation, verification, repair/retry, concise status summaries, escalation levels, and outcome evidence.
+- [ ] Expand the provider-neutral model router and local-model capability management for text, vision, embeddings, speech, image, and optional remote providers.
+- [ ] Implement controlled continual-improvement records with evidence, sandbox/test outcome, benchmark comparison, approval, versioning, and rollback controls.
+- [ ] Complete the modular tool contract, privacy/permission policy, network-transmission audit, and storage-management controls required by the specification.
+- [ ] Implement the strongest Android-safe local project/code workspace and authorized Git workflow, documenting platform limits for sandboxed code execution.
+- [ ] Expand automated offline, network/provider failure, permission, recovery, memory, task, and GitHub regression coverage and align GitHub Actions with the documented test matrix.
+- [ ] Create and maintain the required architecture, offline, online, models, tools, memory, learning, GitHub, security, testing, troubleshooting, changelog, and final capability-reconciliation documentation.
+- [ ] Validate the new local-first Android release on an emulator, checkpoint it, and deliver a revised APK with the completed PDF reconciliation.

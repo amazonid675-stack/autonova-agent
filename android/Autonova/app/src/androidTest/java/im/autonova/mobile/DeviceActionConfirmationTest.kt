@@ -20,7 +20,7 @@ class DeviceActionConfirmationTest {
     @get:Rule val compose = createComposeRule()
 
     private fun document() = LocalDocument(Uri.parse("content://test/document"), "draft.txt", "text/plain", 12)
-    private fun render(action: LocalStorageAction) = compose.setContent { LocalStorageActionConfirmation(action, "draft", {}, {}, {}, {}, {}) }
+    private fun render(action: LocalStorageAction) = compose.setContent { LocalStorageActionConfirmation(action, "draft", {}, {}, {}, {}, {}, {}) }
 
     @Test fun local_create_action_requires_visible_confirmation() {
         render(LocalStorageAction.CreateNote)
@@ -28,6 +28,8 @@ class DeviceActionConfirmationTest {
         compose.onNodeWithText("Create").assertIsDisplayed()
         compose.onNodeWithText("Cancel").assertIsDisplayed()
     }
+
+    @Test fun local_workspace_action_requires_visible_confirmation() { render(LocalStorageAction.CreateWorkspace("sample")); compose.onNodeWithText("Create local workspace?").assertIsDisplayed() }
 
     @Test fun local_open_action_requires_visible_confirmation() { render(LocalStorageAction.Open(document())); compose.onNodeWithText("Open local file?").assertIsDisplayed() }
     @Test fun local_share_action_requires_visible_confirmation() { render(LocalStorageAction.Share(document())); compose.onNodeWithText("Share local file?").assertIsDisplayed() }

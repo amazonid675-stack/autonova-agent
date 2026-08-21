@@ -9,6 +9,7 @@ import im.autonova.mobile.data.AgentRepository
 import im.autonova.mobile.data.LocalModelEngine
 import im.autonova.mobile.data.LocalDocument
 import im.autonova.mobile.data.MobileAgentApi
+import im.autonova.mobile.data.OperatingMode
 import im.autonova.mobile.data.SecureConfig
 import im.autonova.mobile.sync.AgentSyncWorker
 import im.autonova.mobile.SharedAgentContent
@@ -29,6 +30,8 @@ class AutonovaViewModel(application: Application) : AndroidViewModel(application
     private val localModel = LocalModelEngine(application, config)
     private val _configured = MutableStateFlow(config.isConfigured())
     val configured: StateFlow<Boolean> = _configured.asStateFlow()
+    private val _operatingMode = MutableStateFlow(config.operatingMode())
+    val operatingMode: StateFlow<OperatingMode> = _operatingMode.asStateFlow()
     private val _connectionState = MutableStateFlow(if (config.isConfigured()) ConnectionState.CONNECTED else ConnectionState.READY_TO_CONNECT)
     val connectionState: StateFlow<ConnectionState> = _connectionState.asStateFlow()
     private val _feedback = MutableStateFlow<MobileFeedback?>(null)
@@ -45,35 +48,42 @@ class AutonovaViewModel(application: Application) : AndroidViewModel(application
         _feedback.value = MobileFeedback("$label…", FeedbackTone.INFO, true)
         _feedback.value = if (runCatching { action() }.getOrDefault(false)) MobileFeedback("$label complete.", FeedbackTone.SUCCESS) else MobileFeedback("$label could not be completed. Check your connection and try again.", FeedbackTone.ERROR)
     }
-    fun submit(text: String) { if (text.isNotBlank()) viewModelScope.launch { val connected = config.isConfigured(); _feedback.value = MobileFeedback(if (connected) "Sending agent request…" else "Saving a local plan…", FeedbackTone.INFO, true); val sent = repository.submit(text); _feedback.value = if (sent) MobileFeedback(if (connected) "Agent request sent." else "Local plan saved. Connect Autonova to execute it.", FeedbackTone.SUCCESS) else MobileFeedback("The agent request could not be sent. Check your connection and try again.", FeedbackTone.ERROR) } }
+    private fun localFirstAction(label: String, action: suspend () -> Boolean) = viewModelScope.launch {
+        _feedback.value = MobileFeedback("$label…", FeedbackTone.INFO, true)
+        _feedback.value = if (runCatching { action() }.getOrDefault(false)) MobileFeedback("$label complete.", FeedbackTone.SUCCESS) else MobileFeedback("$label could not be completed. Check your local storage or selected mode and try again.", FeedbackTone.ERROR)
+    }
+    fun submit(text: String) { if (text.isNotBlank()) viewModelScope.launch { val connected = config.isConfigured(); _feedback.value = MobileFeedback(if (connected) "Sending agent request…" else "Running with local capabilities…", FeedbackTone.INFO, true); val sent = repository.submit(text); _feedback.value = if (sent) MobileFeedback(if (connected) "Agent request sent." else "Local agent result saved. Online tools remain off until you explicitly enable them.", FeedbackTone.SUCCESS) else MobileFeedback("The agent request could not be completed. Check your selected mode and try again.", FeedbackTone.ERROR) } }
     fun refresh() = connectedAction("refresh your workspace") { repository.refresh() }
-    fun beginMobileSignIn(): String {
+    fun beginMobileSignIn(): String? {
+        val origin = config.apiBaseUrl() ?: run { _feedback.value = MobileFeedback("Enter an optional remote-agent HTTPS endpoint before signing in.", FeedbackTone.ERROR); return null }
         val verifier = "${UUID.randomUUID()}-${UUID.randomUUID()}"
         val challenge = MessageDigest.getInstance("SHA-256").digest(verifier.toByteArray()).joinToString("") { "%02x".format(it) }
         config.saveCodeVerifier(verifier)
         _connectionState.value = ConnectionState.CONNECTING
         _feedback.value = MobileFeedback("Opening secure Autonova sign-in…", FeedbackTone.INFO, true)
-        val origin = config.apiBaseUrl()
         return "$origin/api/mobile/auth/start?serverOrigin=${Uri.encode(origin)}&codeChallenge=$challenge"
     }
     fun completeMobileSignIn(code: String) = viewModelScope.launch {
         _connectionState.value = ConnectionState.CONNECTING
         val verifier = config.consumeCodeVerifier()
         if (verifier == null) { _connectionState.value = ConnectionState.ERROR; _feedback.value = MobileFeedback("This sign-in link is no longer valid. Start secure sign-in again.", FeedbackTone.ERROR); return@launch }
-        runCatching { MobileAgentApi.exchangeMobileGrant(config.apiBaseUrl(), code, verifier) }
+        val endpoint = config.apiBaseUrl() ?: run { _connectionState.value = ConnectionState.ERROR; _feedback.value = MobileFeedback("A remote-agent endpoint is required to complete remote sign-in.", FeedbackTone.ERROR); return@launch }
+        runCatching { MobileAgentApi.exchangeMobileGrant(endpoint, code, verifier) }
             .onSuccess { token -> config.saveAccessToken(token); _configured.value = true; _connectionState.value = ConnectionState.CONNECTED; _feedback.value = MobileFeedback("Autonova is connected and ready to work.", FeedbackTone.SUCCESS); refresh() }
             .onFailure { _connectionState.value = ConnectionState.ERROR; _feedback.value = MobileFeedback("Secure sign-in could not be completed. Start sign-in again and approve access in your browser.", FeedbackTone.ERROR) }
     }
-    fun saveConnection(endpoint: String, sessionCookie: String): Boolean = runCatching { config.saveApiBaseUrl(endpoint.trim()); config.saveSessionCookie(sessionCookie.trim()); _configured.value = true; refresh() }.isSuccess
+    fun setOperatingMode(mode: OperatingMode, endpoint: String): Boolean = runCatching { if (mode == OperatingMode.OPTIONAL_REMOTE_AGENT) config.saveApiBaseUrl(endpoint.trim()); config.setOperatingMode(mode); _operatingMode.value = mode; _configured.value = config.isConfigured(); _feedback.value = MobileFeedback(if (mode == OperatingMode.LOCAL_ONLY) "Local-only mode enabled. Network and remote tools are off." else if (mode == OperatingMode.LOCAL_PLUS_INTERNET) "Local-plus-internet mode enabled. Browser handoff remains user-confirmed." else "Optional remote-agent mode configured. Sign in to use the selected endpoint.", FeedbackTone.SUCCESS); true }.getOrElse { _feedback.value = MobileFeedback(it.message ?: "Could not save operating mode.", FeedbackTone.ERROR); false }
+    fun remoteEndpoint(): String = config.apiBaseUrl().orEmpty()
     fun clearConnection() { config.clearSession(); _configured.value = false; _connectionState.value = ConnectionState.READY_TO_CONNECT; _feedback.value = MobileFeedback("Local Autonova session cleared.", FeedbackTone.INFO) }
-    fun createProject(name: String, description: String) = connectedAction("create the workspace") { repository.createProject(name, description) }
-    fun createTask(request: String) = connectedAction("create the task") { repository.createTask(request) }
+    fun createProject(name: String, description: String) = localFirstAction("create the workspace") { repository.createProject(name, description) }
+    fun createTask(request: String) = localFirstAction("create the task") { repository.createTask(request) }
     fun changeTaskStatus(id: String, status: String) = connectedAction("update the task") { repository.changeTaskStatus(id, status) }
-    fun createMemory(title: String, content: String, layer: String = "PERSONAL") = connectedAction("save the memory") { repository.createMemory(title, content, layer) }
-    fun updateMemory(id: String, title: String, content: String, layer: String) = connectedAction("update the memory") { repository.updateMemory(id, title, content, layer) }
-    fun deleteMemory(id: String) = connectedAction("remove the memory") { repository.deleteMemory(id) }
+    fun createMemory(title: String, content: String, layer: String = "PERSONAL") = localFirstAction("save the memory") { repository.createMemory(title, content, layer) }
+    fun updateMemory(id: String, title: String, content: String, layer: String) = localFirstAction("update the memory") { repository.updateMemory(id, title, content, layer) }
+    fun deleteMemory(id: String) = localFirstAction("remove the memory") { repository.deleteMemory(id) }
     fun setToolPolicy(key: String, policy: String) = connectedAction("update the tool policy") { repository.setToolPolicy(key, policy) }
     fun uploadLocalFile(document: LocalDocument, bytes: ByteArray) = connectedAction("upload ${document.name}") { repository.uploadFile(document, bytes) }
+    fun indexLocalDocument(document: LocalDocument, bytes: ByteArray) = localFirstAction("index ${document.name} locally") { repository.indexLocalDocument(document, bytes) }
     fun uploadDeviceContext(name: String, mimeType: String, bytes: ByteArray) = connectedAction("upload $name") { repository.uploadDeviceContext(name, mimeType, bytes) }
     fun importSharedContent(content: SharedAgentContent) = viewModelScope.launch {
         content.text?.let { submit("Shared from Android:\n$it") }

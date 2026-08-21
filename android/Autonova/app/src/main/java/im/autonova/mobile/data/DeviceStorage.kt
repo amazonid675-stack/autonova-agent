@@ -34,6 +34,16 @@ class DeviceStorage(private val context: Context, private val config: SecureConf
         return LocalDocument(file.uri, file.name ?: safeName, file.type ?: "text/plain", file.length())
     }
 
+    fun createWorkspace(title: String): LocalDocument? {
+        val safeName = title.trim().ifBlank { "Autonova project" }.replace(Regex("[^a-zA-Z0-9._ -]"), "_").take(80)
+        val directory = root()?.createDirectory(safeName) ?: return null
+        val readme = directory.createFile("text/markdown", "README.md") ?: return null
+        context.contentResolver.openOutputStream(readme.uri)?.bufferedWriter()?.use { writer ->
+            writer.write("# $safeName\n\nCreated locally by Autonova in a user-selected Android document folder.\n\nThis workspace is scoped to this folder. Autonova does not receive unrestricted shell or device-file access.\n")
+        } ?: return null
+        return LocalDocument(directory.uri, directory.name ?: safeName, "vnd.android.document/directory", 0L)
+    }
+
     fun readBytes(document: LocalDocument): ByteArray? = context.contentResolver.openInputStream(document.uri)?.use { it.readBytes() }
 
     fun open(document: LocalDocument) {

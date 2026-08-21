@@ -21,3 +21,4 @@ data class GitHubOperation(val id: String, val repository: String, val operation
 @Entity(tableName = "cached_research") data class CachedResearch(@PrimaryKey val id: String, val query: String, val status: String, val summary: String)
 @Entity(tableName = "cached_learning_candidates") data class CachedLearningCandidate(@PrimaryKey val id: String, val title: String, val content: String, val layer: String, val source: String, val status: String)
 @Entity(tableName = "cached_capability_grants") data class CachedCapabilityGrant(@PrimaryKey val id: String, val capability: String, val scope: String, val rationale: String, val status: String, val expiresAt: String, val outcome: String)
+@Entity(tableName = "cached_knowledge_chunks") data class CachedKnowledgeChunk(@PrimaryKey val id: String, val documentId: String, val title: String, val content: String, val terms: String, val updatedAt: Long)

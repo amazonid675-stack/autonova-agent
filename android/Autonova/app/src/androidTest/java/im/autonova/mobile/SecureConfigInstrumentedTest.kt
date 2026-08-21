@@ -3,6 +3,7 @@ package im.autonova.mobile
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import im.autonova.mobile.data.SecureConfig
+import im.autonova.mobile.data.OperatingMode
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
@@ -72,5 +73,22 @@ class SecureConfigInstrumentedTest {
         config.markLearningFingerprint("candidate-1")
         assertTrue(config.hasLearningFingerprint("candidate-1"))
         try { config.setBackgroundIntervalMinutes(14); fail("Android background review must honor the 15-minute minimum") } catch (_: IllegalArgumentException) { }
+    }
+
+    @Test fun local_first_mode_has_no_packaged_remote_endpoint_and_requires_explicit_remote_selection() {
+        val config = SecureConfig(ApplicationProvider.getApplicationContext())
+        config.clearSession()
+        config.setOperatingMode(OperatingMode.LOCAL_ONLY)
+        assertEquals(OperatingMode.LOCAL_ONLY, config.operatingMode())
+        assertFalse(config.internetEnabled())
+        assertFalse(config.remoteAgentEnabled())
+        assertNull(config.apiBaseUrl())
+        config.saveApiBaseUrl("https://agent.example.com")
+        config.setOperatingMode(OperatingMode.LOCAL_PLUS_INTERNET)
+        assertTrue(config.internetEnabled())
+        assertFalse(config.remoteAgentEnabled())
+        config.setOperatingMode(OperatingMode.OPTIONAL_REMOTE_AGENT)
+        assertTrue(config.remoteAgentEnabled())
+        assertFalse(config.isConfigured())
     }
 }

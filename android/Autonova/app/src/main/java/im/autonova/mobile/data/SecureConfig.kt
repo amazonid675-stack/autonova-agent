@@ -6,10 +6,16 @@ import androidx.security.crypto.MasterKey
 import im.autonova.mobile.BuildConfig
 import java.util.UUID
 
+enum class OperatingMode { LOCAL_ONLY, LOCAL_PLUS_INTERNET, OPTIONAL_REMOTE_AGENT }
+
 class SecureConfig(private val context: Context) {
     private val prefs = EncryptedSharedPreferences.create(context, "autonova-secure", MasterKey.Builder(context).setKeyScheme(MasterKey.KeyScheme.AES256_GCM).build(), EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV, EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM)
     fun saveApiBaseUrl(value: String) { require(EndpointPolicy.isAllowed(value)) { "Only public HTTPS endpoints are permitted." }; prefs.edit().putString("api_base_url", value).apply() }
-    fun apiBaseUrl(): String = prefs.getString("api_base_url", null) ?: BuildConfig.DEFAULT_SERVER_ORIGIN
+    fun apiBaseUrl(): String? = prefs.getString("api_base_url", null)?.takeIf { EndpointPolicy.isAllowed(it) } ?: BuildConfig.DEFAULT_SERVER_ORIGIN.takeIf { EndpointPolicy.isAllowed(it) }
+    fun setOperatingMode(mode: OperatingMode) = prefs.edit().putString("operating_mode", mode.name).apply()
+    fun operatingMode(): OperatingMode = prefs.getString("operating_mode", null)?.let { runCatching { OperatingMode.valueOf(it) }.getOrNull() } ?: OperatingMode.LOCAL_ONLY
+    fun internetEnabled(): Boolean = operatingMode() != OperatingMode.LOCAL_ONLY
+    fun remoteAgentEnabled(): Boolean = operatingMode() == OperatingMode.OPTIONAL_REMOTE_AGENT && apiBaseUrl() != null
     fun saveSessionCookie(value: String) { require(value.startsWith("session=")) { "Only the session cookie is stored." }; prefs.edit().putString("session_cookie", value).apply() }
     fun sessionCookie(): String? = prefs.getString("session_cookie", null)
     fun saveAccessToken(value: String) { require(value.length >= 32 && value.count { it == '.' } == 2) { "Invalid mobile access token." }; prefs.edit().putString("access_token", value).apply() }
@@ -38,6 +44,6 @@ class SecureConfig(private val context: Context) {
     fun hasLearningFingerprint(fingerprint: String): Boolean = prefs.getStringSet("learning_fingerprints", emptySet())?.contains(fingerprint) == true
     fun markLearningFingerprint(fingerprint: String) { val current = (prefs.getStringSet("learning_fingerprints", emptySet()) ?: emptySet()).toMutableSet(); current.add(fingerprint); while (current.size > 80) current.remove(current.first()); prefs.edit().putStringSet("learning_fingerprints", current).apply() }
     private fun contextFilesPrefix(): String = context.filesDir.absolutePath
-    fun isConfigured(): Boolean = accessToken() != null
+    fun isConfigured(): Boolean = remoteAgentEnabled() && accessToken() != null
     fun clearSession() = prefs.edit().remove("access_token").remove("session_cookie").remove("code_verifier").apply()
 }

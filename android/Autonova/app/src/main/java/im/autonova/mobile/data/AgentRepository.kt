@@ -16,6 +16,8 @@ import kotlinx.coroutines.launch
 class AgentRepository(private val context: Context, private val cache: AgentCacheDao, private val config: SecureConfig) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val deviceAuditSynchronizer = DeviceAuditSynchronizer(cache)
+    private val localModel = LocalModelEngine(context, config)
+    private val localKnowledge = LocalKnowledgeEngine(cache)
     private val _messages = MutableStateFlow<List<ChatMessage>>(emptyList()); private val _tasks = MutableStateFlow<List<AgentTask>>(emptyList()); private val _projects = MutableStateFlow<List<AgentProject>>(emptyList())
     private val _memories = MutableStateFlow<List<MemoryItem>>(emptyList()); private val _activity = MutableStateFlow<List<ActivityItem>>(emptyList())
     private val _files = MutableStateFlow<List<FileItem>>(emptyList()); private val _tools = MutableStateFlow<List<ToolItem>>(emptyList()); private val _provider = MutableStateFlow<ProviderItem?>(null)
@@ -31,7 +33,7 @@ class AgentRepository(private val context: Context, private val cache: AgentCach
         if (!deviceAuditSynchronizer.record(DeviceAuditEvent(capability, scopeValue, detail, outcome), remoteAudit)) return false
         refresh(); true
     }.getOrDefault(false)
-    private fun api(): MobileAgentApi? = config.accessToken()?.let { MobileAgentApi(config.apiBaseUrl(), it) }
+    private fun api(): MobileAgentApi? = if (config.remoteAgentEnabled()) config.accessToken()?.let { token -> config.apiBaseUrl()?.let { endpoint -> MobileAgentApi(endpoint, token) } } else null
     suspend fun refresh(): Boolean {
         val api = api() ?: return false
         val previousStatuses = _tasks.value.associate { it.id to it.status.name }
@@ -47,18 +49,26 @@ class AgentRepository(private val context: Context, private val cache: AgentCach
     suspend fun submit(text: String): Boolean {
         val now = System.currentTimeMillis(); appendLocalMessage(ChatMessage("local-$now", "user", text, now)); val api = api()
         if (api != null) { val assistantId = "agent-${System.currentTimeMillis()}"; val assistantCreatedAt = System.currentTimeMillis(); var receivedSnapshot = false; val result = runCatching { api.sendMessage(text) { snapshot -> if (snapshot.isNotBlank()) { receivedSnapshot = true; cache.upsertMessage(CachedMessage(assistantId, "assistant", snapshot, assistantCreatedAt)) } } }; if (result.isFailure) return false; val reply = result.getOrNull(); if (!receivedSnapshot && !reply.isNullOrBlank()) cache.upsertMessage(CachedMessage(assistantId, "assistant", reply, assistantCreatedAt)) }
-        else appendLocalMessage(ChatMessage("local-agent-${System.currentTimeMillis()}", "assistant", "I saved this as a local agent request. Connect your Autonova account to execute cloud research, GitHub, files, image generation, and multi-step verification. You can still review the task plan in Tasks.", System.currentTimeMillis()))
+        else {
+            val memory = cache.localMemorySnippets().joinToString("\n") { "- ${it.title}: ${it.content.take(500)}" }
+            val knowledge = localKnowledge.retrieve(text).joinToString("\n\n") { "[Local document: ${it.title}; lexical relevance ${it.score}]\n${it.excerpt}" }
+            val prompt = buildString { append("You are Autonova running fully on this Android device. Be concise, honest about limitations, and do not claim network access or actions you did not perform."); if (memory.isNotBlank()) append("\n\nApproved local memory:\n$memory"); if (knowledge.isNotBlank()) append("\n\nLocal document evidence:\n$knowledge"); append("\n\nUser request:\n$text") }
+            val response = localModel.generate(prompt).getOrElse { error -> "Offline request saved locally. A compatible on-device `.task` model is required for local reasoning. Import one in Device Capabilities, or explicitly choose Optional remote agent mode for online tools. Details: ${error.message ?: "local model unavailable"}" }
+            appendLocalMessage(ChatMessage("local-model-${System.currentTimeMillis()}", "assistant", response, System.currentTimeMillis()))
+            recordLocalActivity("LOCAL_AGENT", "Local agent response", if (response.startsWith("Offline request saved")) "No compatible local model was available." else "Generated with the user-selected local model and local memory context.")
+        }
         if (text.lowercase().startsWith("build") || text.lowercase().startsWith("create") || text.lowercase().startsWith("research") || text.lowercase().startsWith("plan")) createLocalTask(text)
         return true
     }
-    suspend fun createProject(name: String, description: String): Boolean = runCatching { api()?.createProject(name, description) ?: error("Connect the secure session first."); refresh() }.isSuccess
-    suspend fun createTask(request: String): Boolean = runCatching { api()?.createTask(request) ?: error("Connect the secure session first."); refresh() }.isSuccess
+    suspend fun createProject(name: String, description: String): Boolean = runCatching { val client = api(); if (client != null) { client.createProject(name, description); refresh() } else { cache.upsertProjects(listOf(CachedProject("local-project-${System.currentTimeMillis()}", name, description))); recordLocalActivity("LOCAL_PROJECT", "Local workspace created", name) }; true }.getOrDefault(false)
+    suspend fun createTask(request: String): Boolean = runCatching { val client = api(); if (client != null) { client.createTask(request); refresh() } else { val now = System.currentTimeMillis(); cache.upsertTasks(listOf(CachedTask("local-task-$now", request, TaskStatus.QUEUED.name, now))); recordLocalActivity("LOCAL_TASK", "Local task queued", request.take(240)) }; true }.getOrDefault(false)
     suspend fun changeTaskStatus(id: String, status: String): Boolean = runCatching { api()?.changeTaskStatus(id, status) ?: error("Connect the secure session first."); refresh() }.isSuccess
-    suspend fun createMemory(title: String, content: String, layer: String): Boolean = runCatching { api()?.createMemory(title, content, layer) ?: error("Connect the secure session first."); refresh() }.isSuccess
-    suspend fun updateMemory(id: String, title: String, content: String, layer: String): Boolean = runCatching { api()?.updateMemory(id, title, content, layer) ?: error("Connect the secure session first."); refresh() }.isSuccess
-    suspend fun deleteMemory(id: String): Boolean = runCatching { api()?.deleteMemory(id) ?: error("Connect the secure session first."); refresh() }.isSuccess
+    suspend fun createMemory(title: String, content: String, layer: String): Boolean = runCatching { val client = api(); if (client != null) { client.createMemory(title, content, layer); refresh() } else { cache.upsertMemories(listOf(CachedMemory("local-memory-${System.currentTimeMillis()}", title, content, layer))); recordLocalActivity("LOCAL_MEMORY", "Local memory saved", title) }; true }.getOrDefault(false)
+    suspend fun updateMemory(id: String, title: String, content: String, layer: String): Boolean = runCatching { val client = api(); if (client != null) { client.updateMemory(id, title, content, layer); refresh() } else { val existing = cache.localMemory(id) ?: error("Local memory was not found."); cache.upsertMemories(listOf(existing.copy(title = title, content = content, layer = layer))); recordLocalActivity("LOCAL_MEMORY", "Local memory updated", title) }; true }.getOrDefault(false)
+    suspend fun deleteMemory(id: String): Boolean = runCatching { val client = api(); if (client != null) { client.deleteMemory(id); refresh() } else { cache.deleteLocalMemory(id); recordLocalActivity("LOCAL_MEMORY", "Local memory deleted", id) }; true }.getOrDefault(false)
     suspend fun setToolPolicy(key: String, policy: String): Boolean = runCatching { api()?.setToolPolicy(key, policy) ?: error("Connect the secure session first."); refresh() }.isSuccess
     suspend fun uploadFile(document: LocalDocument, bytes: ByteArray): Boolean = runCatching { require(bytes.size <= 10 * 1024 * 1024) { "Files must be 10 MB or smaller." }; api()?.uploadFile(document.name, document.mimeType, Base64.encodeToString(bytes, Base64.NO_WRAP)) ?: error("Connect the secure session first."); refresh() }.isSuccess
+    suspend fun indexLocalDocument(document: LocalDocument, bytes: ByteArray): Boolean = runCatching { val readable = bytes.toString(Charsets.UTF_8); val chunks = localKnowledge.index(document.uri.toString(), document.name, readable).getOrThrow(); recordLocalActivity("LOCAL_KNOWLEDGE", "Document indexed locally", "${document.name}: $chunks local text chunks. No network transfer occurred."); true }.getOrDefault(false)
     suspend fun uploadDeviceContext(name: String, mimeType: String, bytes: ByteArray): Boolean = runCatching { require(bytes.size in 1..10 * 1024 * 1024) { "Device context must be 10 MB or smaller." }; api()?.uploadFile(name, mimeType, Base64.encodeToString(bytes, Base64.NO_WRAP)) ?: error("Connect the secure session first."); refresh() }.isSuccess
     suspend fun saveProvider(name: String, providerType: String, baseUrl: String, model: String, apiKey: String, costMode: String): Boolean = runCatching { api()?.saveProvider(ProviderRequest(name, providerType, baseUrl.ifBlank { null }, model.ifBlank { null }, apiKey.ifBlank { null }, costMode)) ?: error("Connect the secure session first."); refresh() }.isSuccess
     suspend fun refreshUsage(): Boolean = runCatching { val wire = api()?.usage() ?: error("Connect the secure session first."); _usage.value = UsageSummary(wire.totals.inputTokens, wire.totals.outputTokens, wire.totals.toolCalls, wire.totals.estimatedCostMicros, wire.records.map { UsageRecord(it.model, it.inputTokens, it.outputTokens, it.toolCalls) }) }.isSuccess
