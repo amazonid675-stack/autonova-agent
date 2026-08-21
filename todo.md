@@ -82,5 +82,6 @@
 - [x] Link device-side approved actions to the same consent/grant records used by research and GitHub flows rather than only writing generic activity entries.
 - [x] Add a protected mobile API path that persists browser, clipboard, storage, and background approvals into server-side capability grants with scope, outcome, and revoke status.
 - [x] Link Android device-action recording and background outcomes to the protected consent-grant API while retaining the offline Room audit cache.
-- [ ] Add backend automated tests for the protected device-audit endpoint, including approved, completed, failed, and revoked capability-grant persistence semantics.
-- [ ] Add Android automated coverage for device-action and background-review consent synchronization while preserving the offline Room audit cache.
+- [x] Add backend automated tests for the protected device-audit endpoint, including approved, completed, failed, and revoked capability-grant persistence semantics.
+- [x] Add Android automated coverage for device-action and background-review consent synchronization while preserving the offline Room audit cache.
+- [x] Add backend route-level tests for the protected device-audit endpoint, covering authentication, validation, success outcomes, and unavailable storage.
