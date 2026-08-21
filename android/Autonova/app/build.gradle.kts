@@ -9,7 +9,7 @@ plugins {
 android {
     namespace = "im.autonova.mobile"
     compileSdk = 35
-    defaultConfig { applicationId = "im.autonova.mobile"; minSdk = 26; targetSdk = 35; versionCode = 4; versionName = "0.4.0"; testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"; buildConfigField("String", "DEFAULT_SERVER_ORIGIN", "\"\"") }
+    defaultConfig { applicationId = "im.autonova.mobile"; minSdk = 26; targetSdk = 35; versionCode = 5; versionName = "0.5.0"; testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"; buildConfigField("String", "DEFAULT_SERVER_ORIGIN", "\"\"") }
     buildFeatures { compose = true; buildConfig = true }
     buildTypes { release { isMinifyEnabled = false; proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro") } }
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }

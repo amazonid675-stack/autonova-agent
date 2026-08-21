@@ -98,6 +98,13 @@
 - [ ] Expand automated offline, network/provider failure, permission, recovery, memory, task, and GitHub regression coverage and align GitHub Actions with the documented test matrix.
 - [x] Create and maintain the required architecture, offline, online, models, tools, memory, learning, GitHub, security, testing, troubleshooting, changelog, and final capability-reconciliation documentation.
 - [ ] Validate the new local-first Android release on an emulator, checkpoint it, and deliver a revised APK with the completed PDF reconciliation.
-- [ ] Add storage-management controls for model, project, document-index, cache, export/archive, and Android-supported content moves, with user-visible privacy and provider disclosure before external transmission.
+- [x] Add storage-management controls for model, project, document-index, cache, copy/export/archive, and separate confirmed deletion, with user-visible privacy and provider disclosure before external transmission; document that arbitrary atomic moves remain provider-dependent and unsupported.
 - [ ] Extend the scoped Android workspace with local file editing/search and the strongest supported authorized Git synchronization flow, keeping unsupported shell execution explicit.
 - [ ] Add failure-path regression coverage for no model, permission denial, provider/network loss, task restart recovery, and GitHub authorization or conflict handling, and wire the expanded suite into CI.
+- [x] Add offline index usage reporting and confirmation-gated clearing for local document chunks without deleting source documents.
+- [x] Add confirmation-gated local cache clearing with explicit scope disclosure and durable activity auditing.
+- [x] Add Android document-tree editing, recursive filename search, and explicit export/archive or content-move affordances within the user-selected storage scope.
+- [x] Expand scoped-storage UI tests for local index/cache management, editing/search entry points, and all consequential local file actions.
+- [x] Add a confirmation-gated local ZIP archive workflow for selected files and workspaces without external transmission.
+- [x] Add Compose coverage for the visible local index and activity-cache management controls and their confirmation entry points.
+- [ ] Add Android recovery-path regression coverage for unavailable local models, denied permissions, remote failures, Room-backed task persistence, and GitHub authorization/conflict reporting.

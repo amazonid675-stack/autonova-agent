@@ -20,6 +20,13 @@ class MobileAgentApiTest {
         assertNull(decodeStreamEvent("{\"type\":\"status\",\"label\":\"Reviewing approved context\"}"))
     }
 
+    @Test fun `preserves provider or GitHub failure details for visible recovery guidance`() {
+        assertEquals(
+            MobileStreamEvent.Error("GitHub authorization failed or the branch has changed. Review the operation and retry."),
+            decodeStreamEvent("{\"type\":\"error\",\"message\":\"GitHub authorization failed or the branch has changed. Review the operation and retry.\"}")
+        )
+    }
+
     @Test fun `uses a bearer authorization value rather than a browser cookie`() {
         assertEquals("Bearer header.payload.signature", bearerAuthorizationValue("header.payload.signature"))
     }

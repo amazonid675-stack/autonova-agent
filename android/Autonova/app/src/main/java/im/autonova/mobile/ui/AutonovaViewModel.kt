@@ -38,7 +38,7 @@ class AutonovaViewModel(application: Application) : AndroidViewModel(application
     val feedback: StateFlow<MobileFeedback?> = _feedback.asStateFlow()
     private val _pendingCloudFallback = MutableStateFlow<String?>(null)
     val pendingCloudFallback: StateFlow<String?> = _pendingCloudFallback.asStateFlow()
-    val messages = repository.messages; val tasks = repository.tasks; val projects = repository.projects; val memories = repository.memories; val activity = repository.activity; val files = repository.files; val tools = repository.tools; val provider = repository.provider; val usage = repository.usage; val github = repository.github; val generatedImageUrl = repository.generatedImageUrl; val research = repository.research; val learningCandidates = repository.learningCandidates; val capabilityGrants = repository.capabilityGrants; val githubConnection = repository.githubConnection; val githubOperations = repository.githubOperations
+    val messages = repository.messages; val tasks = repository.tasks; val projects = repository.projects; val memories = repository.memories; val activity = repository.activity; val files = repository.files; val tools = repository.tools; val provider = repository.provider; val usage = repository.usage; val github = repository.github; val generatedImageUrl = repository.generatedImageUrl; val research = repository.research; val learningCandidates = repository.learningCandidates; val capabilityGrants = repository.capabilityGrants; val githubConnection = repository.githubConnection; val githubOperations = repository.githubOperations; val localKnowledgeUsage = repository.localKnowledgeUsage
     init { AgentSyncWorker.enqueue(application) }
     fun clearFeedback() { _feedback.value = null }
     fun showError(message: String) { _feedback.value = MobileFeedback(message, FeedbackTone.ERROR) }
@@ -84,6 +84,8 @@ class AutonovaViewModel(application: Application) : AndroidViewModel(application
     fun setToolPolicy(key: String, policy: String) = connectedAction("update the tool policy") { repository.setToolPolicy(key, policy) }
     fun uploadLocalFile(document: LocalDocument, bytes: ByteArray) = connectedAction("upload ${document.name}") { repository.uploadFile(document, bytes) }
     fun indexLocalDocument(document: LocalDocument, bytes: ByteArray) = localFirstAction("index ${document.name} locally") { repository.indexLocalDocument(document, bytes) }
+    fun clearLocalKnowledgeIndex() = localFirstAction("clear the local document index") { repository.clearLocalKnowledgeIndex() }
+    fun clearLocalActivityCache() = localFirstAction("clear local activity summaries") { repository.clearLocalActivityCache() }
     fun uploadDeviceContext(name: String, mimeType: String, bytes: ByteArray) = connectedAction("upload $name") { repository.uploadDeviceContext(name, mimeType, bytes) }
     fun importSharedContent(content: SharedAgentContent) = viewModelScope.launch {
         content.text?.let { submit("Shared from Android:\n$it") }

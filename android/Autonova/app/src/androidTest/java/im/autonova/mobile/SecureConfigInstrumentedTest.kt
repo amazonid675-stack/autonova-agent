@@ -2,6 +2,7 @@ package im.autonova.mobile
 
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import im.autonova.mobile.data.LocalModelEngine
 import im.autonova.mobile.data.SecureConfig
 import im.autonova.mobile.data.OperatingMode
 import org.junit.Assert.assertEquals
@@ -13,6 +14,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
 import org.junit.runner.RunWith
+import kotlinx.coroutines.runBlocking
 import java.io.File
 
 @RunWith(AndroidJUnit4::class)
@@ -90,5 +92,18 @@ class SecureConfigInstrumentedTest {
         config.setOperatingMode(OperatingMode.OPTIONAL_REMOTE_AGENT)
         assertTrue(config.remoteAgentEnabled())
         assertFalse(config.isConfigured())
+    }
+
+    @Test fun unavailable_local_model_reports_an_honest_recovery_state_without_network_access() = runBlocking {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val config = SecureConfig(context)
+        config.clearLocalModel()
+        val engine = LocalModelEngine(context, config)
+        assertEquals("No local model imported.", engine.status())
+        assertFalse(engine.isAvailable())
+        assertEquals(0L, engine.storageBytes())
+        val result = engine.generate("Explain this locally")
+        assertTrue(result.isFailure)
+        assertTrue(result.exceptionOrNull()?.message?.contains("Import a compatible local .task model first.") == true)
     }
 }
