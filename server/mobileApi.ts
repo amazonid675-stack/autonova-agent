@@ -7,6 +7,7 @@ import { createContext } from "./_core/context";
 import * as db from "./db";
 import { storagePut } from "./storage";
 import { generateImage } from "./_core/imageGeneration";
+import { executeWorkspaceFileWrite } from "./githubWorkspace";
 import { decryptSecret, encryptSecret } from "./security";
 import { encodeOAuthState, OAUTH_STATE_COOKIE } from "../shared/const";
 import { ENV } from "./_core/env";
@@ -19,6 +20,13 @@ const memorySchema = z.object({ title: z.string().trim().min(1).max(180), conten
 const toolSchema = z.object({ policy: z.enum(["ASK", "ALLOW", "DENY"]) });
 const fileSchema = z.object({ name: z.string().trim().min(1).max(180), mimeType: z.string().trim().min(1).max(160), dataBase64: z.string().min(4).max(14_000_000) });
 const taskActionSchema = z.object({ status: z.enum(["QUEUED", "CANCELLED"]) });
+export const taskObservationSchema = z.object({ summary: z.string().trim().min(3).max(1000), evidence: z.string().trim().min(3).max(2000).optional() });
+export const mobileToolKeySchema = z.enum(["web_search", "github", "code_executor", "document_reader", "image_generation", "http_request"]);
+export const taskToolSchema = z.object({ toolKey: mobileToolKeySchema, rationale: z.string().trim().min(3).max(500) });
+export const taskToolApprovalSchema = z.object({ toolKey: mobileToolKeySchema, approved: z.boolean(), note: z.string().trim().min(3).max(500).optional() });
+export const taskRepairSchema = z.object({ diagnosis: z.string().trim().min(3).max(1200), repairSteps: z.array(z.object({ title: z.string().trim().min(3).max(160), detail: z.string().trim().max(500).optional(), toolKey: mobileToolKeySchema.optional() })).min(1).max(4) });
+export const taskEscalationSchema = z.object({ level: z.enum(["INPUT", "PERMISSION", "PROVIDER", "HUMAN_REVIEW"]), summary: z.string().trim().min(3).max(800) });
+export const taskVerificationSchema = z.object({ passed: z.boolean(), evidence: z.string().trim().min(3).max(2000), nextAction: z.string().trim().min(3).max(400).optional() });
 const providerSchema = z.object({ name: z.string().trim().min(1).max(120), providerType: z.enum(["BUILT_IN", "OPENAI_COMPATIBLE"]), baseUrl: z.string().trim().max(500).optional(), activeModel: z.string().trim().max(160).optional(), apiKey: z.string().trim().min(8).max(4000).optional(), costMode: z.enum(["LOCAL_ONLY", "BALANCED", "POWER"]) });
 const imageSchema = z.object({ prompt: z.string().trim().min(3).max(1200) });
 const githubRepositorySchema = z.string().trim().regex(/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/);
@@ -26,14 +34,17 @@ const publicSourceSchema = z.string().trim().url().max(2048).refine(value => new
 export const researchSchema = z.object({ query: z.string().trim().min(3).max(600), sources: z.array(publicSourceSchema).min(1).max(5) });
 const learningCandidateSchema = z.object({ title: z.string().trim().min(1).max(200), content: z.string().trim().min(1).max(12000), layer: z.enum(["TASK", "PROJECT", "PERSONAL", "DOCUMENT"]).default("PERSONAL"), source: z.string().trim().min(1).max(160).default("ANDROID_LOCAL") });
 const learningDecisionSchema = z.object({ status: z.enum(["APPROVED", "DISMISSED"]), title: z.string().trim().min(1).max(200).optional(), content: z.string().trim().min(1).max(12000).optional(), layer: z.enum(["TASK", "PROJECT", "PERSONAL", "DOCUMENT"]).optional() });
+export const improvementSchema = z.object({ scope: z.enum(["PROMPT", "TOOL", "WORKFLOW", "MODEL_ROUTING"]), title: z.string().trim().min(3).max(200), proposedChange: z.string().trim().min(5).max(5000), evidence: z.string().trim().min(3).max(5000), testOutcome: z.string().trim().min(3).max(3000), benchmarkSummary: z.string().trim().min(3).max(3000), versionLabel: z.string().trim().min(1).max(120) });
+export const improvementDecisionSchema = z.object({ status: z.enum(["APPROVED", "REJECTED", "ROLLED_BACK"]), note: z.string().trim().min(3).max(1500) });
 const capabilityGrantSchema = z.object({ capability: z.string().trim().regex(/^[a-z0-9_.-]{2,100}$/i), scope: z.string().trim().min(1).max(4000), rationale: z.string().trim().max(2000).optional(), expiresAt: z.string().datetime().optional() });
 const capabilityGrantDecisionSchema = z.object({ status: z.enum(["APPROVED", "DECLINED", "REVOKED"]) });
 export const deviceAuditSchema = z.object({ capability: z.string().trim().regex(/^[a-z0-9_.-]{2,100}$/i), scope: z.string().trim().min(1).max(4000), detail: z.string().trim().min(1).max(2000), outcome: z.enum(["APPROVED", "COMPLETED", "FAILED", "REVOKED"]) });
 const githubConnectionSchema = z.object({ token: z.string().trim().min(20).max(4000), scopes: z.string().trim().min(1).max(1000) });
-export const githubOperationSchema = z.object({ repository: githubRepositorySchema, operation: z.enum(["CREATE_ISSUE", "CREATE_BRANCH", "CREATE_PULL_REQUEST"]), title: z.string().trim().min(1).max(240).optional(), body: z.string().trim().max(6000).optional(), branch: z.string().trim().regex(/^[A-Za-z0-9._/-]{1,120}$/).optional(), fromBranch: z.string().trim().regex(/^[A-Za-z0-9._/-]{1,120}$/).optional(), head: z.string().trim().regex(/^[A-Za-z0-9._/-]{1,160}$/).optional(), base: z.string().trim().regex(/^[A-Za-z0-9._/-]{1,120}$/).optional() }).superRefine((value, context) => {
+export const githubOperationSchema = z.object({ repository: githubRepositorySchema, operation: z.enum(["CREATE_ISSUE", "CREATE_BRANCH", "CREATE_PULL_REQUEST", "WRITE_WORKSPACE_FILE"]), title: z.string().trim().min(1).max(240).optional(), body: z.string().trim().max(6000).optional(), branch: z.string().trim().regex(/^[A-Za-z0-9._/-]{1,120}$/).optional(), fromBranch: z.string().trim().regex(/^[A-Za-z0-9._/-]{1,120}$/).optional(), head: z.string().trim().regex(/^[A-Za-z0-9._/-]{1,160}$/).optional(), base: z.string().trim().regex(/^[A-Za-z0-9._/-]{1,120}$/).optional(), filePath: z.string().trim().regex(/^(?!.*(?:^|\/)\.\.(?:\/|$))[A-Za-z0-9._/-]{1,240}$/).optional(), content: z.string().max(500_000).optional(), expectedSha: z.string().trim().regex(/^[a-f0-9]{40}$/i).optional() }).superRefine((value, context) => {
   if (value.operation === "CREATE_ISSUE" && !value.title) context.addIssue({ code: z.ZodIssueCode.custom, message: "Issue title is required." });
   if (value.operation === "CREATE_BRANCH" && (!value.branch || !value.fromBranch)) context.addIssue({ code: z.ZodIssueCode.custom, message: "New and source branch names are required." });
   if (value.operation === "CREATE_PULL_REQUEST" && (!value.title || !value.head || !value.base)) context.addIssue({ code: z.ZodIssueCode.custom, message: "Pull-request title, head, and base branches are required." });
+  if (value.operation === "WRITE_WORKSPACE_FILE" && (!value.title || !value.filePath || value.content === undefined)) context.addIssue({ code: z.ZodIssueCode.custom, message: "A commit message, relative text-file path, and selected file content are required." });
 });
 const mobileLoginSchema = z.object({ serverOrigin: z.string().url(), codeChallenge: z.string().regex(/^[a-f0-9]{64}$/i) });
 const mobileExchangeSchema = z.object({ code: z.string().min(32).max(128), codeVerifier: z.string().min(32).max(256) });
@@ -180,6 +191,54 @@ export function registerMobileApi(app: Express) {
     await db.createActivity(ctx.user.id, { taskId, eventType: "MOBILE_TASK", title: parsed.data.status === "CANCELLED" ? "Task cancelled from Android" : "Task retried from Android", visibility: "STANDARD" });
     return res.status(204).end();
   });
+  app.post("/api/mobile/tasks/:taskId/observe", async (req, res) => {
+    const ctx = await requireMobileUser(req, res); if (!ctx) return res.status(401).json({ error: "Authentication required" });
+    const taskId = Number(req.params.taskId); const parsed = taskObservationSchema.safeParse(req.body); const task = Number.isInteger(taskId) ? await db.getTask(ctx.user.id, taskId) : null;
+    if (!task || !parsed.success || ["COMPLETED", "CANCELLED"].includes(task.status)) return res.status(400).json({ error: "This task cannot accept an observation." });
+    await db.createTaskEvidence(ctx.user.id, { taskId, kind: "OBSERVATION", summary: parsed.data.summary, evidence: parsed.data.evidence, outcome: "COMPLETED" });
+    await db.createActivity(ctx.user.id, { taskId, eventType: "MOBILE_TASK_OBSERVATION", title: "Task observation recorded from Android", detail: parsed.data.summary, visibility: "STANDARD" });
+    return res.status(201).json({ status: task.status, summary: parsed.data.summary });
+  });
+  app.post("/api/mobile/tasks/:taskId/select-tool", async (req, res) => {
+    const ctx = await requireMobileUser(req, res); if (!ctx) return res.status(401).json({ error: "Authentication required" });
+    const taskId = Number(req.params.taskId); const parsed = taskToolSchema.safeParse(req.body); const task = Number.isInteger(taskId) ? await db.getTask(ctx.user.id, taskId) : null;
+    if (!task || !parsed.success || !["RUNNING", "PLANNING", "WAITING_FOR_USER", "WAITING_FOR_TOOL"].includes(task.status)) return res.status(400).json({ error: "This task cannot select a tool now." });
+    const policy = (await db.listToolPermissions(ctx.user.id)).find(item => item.toolKey === parsed.data.toolKey)?.policy ?? "ASK";
+    if (policy === "DENY") { await db.createTaskEvidence(ctx.user.id, { taskId, kind: "TOOL_SELECTION", toolKey: parsed.data.toolKey, summary: parsed.data.rationale, outcome: "DECLINED" }); return res.status(409).json({ error: "This tool is denied by the current policy." }); }
+    const status = policy === "ASK" ? "WAITING_FOR_USER" as const : "WAITING_FOR_TOOL" as const;
+    await db.updateTask(ctx.user.id, taskId, { status }); await db.createTaskEvidence(ctx.user.id, { taskId, kind: "TOOL_SELECTION", toolKey: parsed.data.toolKey, summary: parsed.data.rationale, outcome: policy === "ASK" ? "PENDING" : "APPROVED" });
+    await db.createActivity(ctx.user.id, { taskId, eventType: "MOBILE_TASK_TOOL", title: policy === "ASK" ? "Tool approval needed" : "Task tool selected", detail: `${parsed.data.toolKey}: ${parsed.data.rationale}`, visibility: "STANDARD" });
+    return res.status(201).json({ status, policy });
+  });
+  app.post("/api/mobile/tasks/:taskId/tool-approval", async (req, res) => {
+    const ctx = await requireMobileUser(req, res); if (!ctx) return res.status(401).json({ error: "Authentication required" });
+    const taskId = Number(req.params.taskId); const parsed = taskToolApprovalSchema.safeParse(req.body); const task = Number.isInteger(taskId) ? await db.getTask(ctx.user.id, taskId) : null;
+    if (!task || !parsed.success || task.status !== "WAITING_FOR_USER") return res.status(400).json({ error: "This task is not awaiting a tool decision." });
+    const status = parsed.data.approved ? "WAITING_FOR_TOOL" as const : "RUNNING" as const; await db.updateTask(ctx.user.id, taskId, { status }); await db.createTaskEvidence(ctx.user.id, { taskId, kind: "TOOL_APPROVAL", toolKey: parsed.data.toolKey, summary: parsed.data.note ?? "Android owner decision", outcome: parsed.data.approved ? "APPROVED" : "DECLINED" });
+    return res.status(201).json({ status });
+  });
+  app.post("/api/mobile/tasks/:taskId/repair", async (req, res) => {
+    const ctx = await requireMobileUser(req, res); if (!ctx) return res.status(401).json({ error: "Authentication required" });
+    const taskId = Number(req.params.taskId); const parsed = taskRepairSchema.safeParse(req.body); const task = Number.isInteger(taskId) ? await db.getTask(ctx.user.id, taskId) : null;
+    if (!task || !parsed.success || !["FAILED", "VERIFYING", "WAITING_FOR_TOOL"].includes(task.status)) return res.status(400).json({ error: "This task cannot accept a repair plan now." });
+    const steps = await db.listTaskSteps(taskId); await db.appendTaskSteps(taskId, steps.length, parsed.data.repairSteps); await db.updateTask(ctx.user.id, taskId, { status: "RUNNING", errorSummary: null, retryCount: task.retryCount + 1 }); await db.createTaskEvidence(ctx.user.id, { taskId, kind: "REPAIR", summary: parsed.data.diagnosis, evidence: parsed.data.repairSteps.map(step => step.title).join("; "), outcome: "APPROVED" });
+    return res.status(201).json({ status: "RUNNING" });
+  });
+  app.post("/api/mobile/tasks/:taskId/escalate", async (req, res) => {
+    const ctx = await requireMobileUser(req, res); if (!ctx) return res.status(401).json({ error: "Authentication required" });
+    const taskId = Number(req.params.taskId); const parsed = taskEscalationSchema.safeParse(req.body); const task = Number.isInteger(taskId) ? await db.getTask(ctx.user.id, taskId) : null;
+    if (!task || !parsed.success || ["COMPLETED", "CANCELLED"].includes(task.status)) return res.status(400).json({ error: "This task cannot be escalated." });
+    await db.updateTask(ctx.user.id, taskId, { status: "WAITING_FOR_USER" }); await db.createTaskEvidence(ctx.user.id, { taskId, kind: "ESCALATION", summary: parsed.data.summary, evidence: parsed.data.level, outcome: "PENDING" });
+    return res.status(201).json({ status: "WAITING_FOR_USER", level: parsed.data.level });
+  });
+  app.post("/api/mobile/tasks/:taskId/verify", async (req, res) => {
+    const ctx = await requireMobileUser(req, res); if (!ctx) return res.status(401).json({ error: "Authentication required" });
+    const taskId = Number(req.params.taskId); const parsed = taskVerificationSchema.safeParse(req.body); const task = Number.isInteger(taskId) ? await db.getTask(ctx.user.id, taskId) : null;
+    if (!task || !parsed.success || task.status !== "VERIFYING") return res.status(400).json({ error: "This task is not awaiting verification." });
+    const status = parsed.data.passed ? "COMPLETED" as const : "FAILED" as const;
+    await db.updateTask(ctx.user.id, taskId, parsed.data.passed ? { status, completedAt: new Date(), finalResult: parsed.data.evidence } : { status, errorSummary: parsed.data.evidence }); await db.createTaskEvidence(ctx.user.id, { taskId, kind: "VERIFICATION", summary: parsed.data.passed ? "Verification passed" : "Verification failed", evidence: parsed.data.evidence, outcome: parsed.data.passed ? "COMPLETED" : "FAILED" });
+    return res.status(201).json({ status });
+  });
   app.post("/api/mobile/memories", async (req, res) => {
     const ctx = await requireMobileUser(req, res); if (!ctx) return res.status(401).json({ error: "Authentication required" });
     const parsed = memorySchema.safeParse(req.body); if (!parsed.success) return res.status(400).json({ error: "Invalid memory" });
@@ -309,6 +368,25 @@ export function registerMobileApi(app: Express) {
     await db.createActivity(ctx.user.id, { eventType: "LEARNING_APPROVED", title: "Learning candidate saved to memory", detail: title, visibility: "STANDARD" });
     return res.json(memory);
   });
+  app.post("/api/mobile/improvements", async (req, res) => {
+    const ctx = await requireMobileUser(req, res); if (!ctx) return res.status(401).json({ error: "Authentication required" });
+    const parsed = improvementSchema.safeParse(req.body); if (!parsed.success) return res.status(400).json({ error: "Invalid improvement record." });
+    const record = await db.createImprovementRecord(ctx.user.id, parsed.data);
+    if (!record) return res.status(503).json({ error: "Improvement storage is unavailable." });
+    await db.createActivity(ctx.user.id, { eventType: "IMPROVEMENT_PROPOSED", title: "Improvement record awaiting review", detail: `${record.scope} · ${record.title}`, visibility: "STANDARD" });
+    return res.status(201).json(record);
+  });
+  app.put("/api/mobile/improvements/:recordId", async (req, res) => {
+    const ctx = await requireMobileUser(req, res); if (!ctx) return res.status(401).json({ error: "Authentication required" });
+    const recordId = Number(req.params.recordId); const parsed = improvementDecisionSchema.safeParse(req.body);
+    const record = Number.isInteger(recordId) ? await db.getImprovementRecord(ctx.user.id, recordId) : null;
+    if (!record || !parsed.success) return res.status(400).json({ error: "Invalid improvement review." });
+    if (["APPROVED", "REJECTED"].includes(parsed.data.status) && record.status !== "PENDING") return res.status(400).json({ error: "Only pending improvements can be approved or rejected." });
+    if (parsed.data.status === "ROLLED_BACK" && record.status !== "APPROVED") return res.status(400).json({ error: "Only approved improvements can be rolled back." });
+    await db.updateImprovementRecord(ctx.user.id, record.id, { status: parsed.data.status, reviewNote: parsed.data.note, approvedAt: parsed.data.status === "APPROVED" ? new Date() : null, rolledBackAt: parsed.data.status === "ROLLED_BACK" ? new Date() : null });
+    await db.createActivity(ctx.user.id, { eventType: `IMPROVEMENT_${parsed.data.status}`, title: `Improvement ${parsed.data.status.toLowerCase()}`, detail: record.title, visibility: "STANDARD" });
+    return res.status(204).end();
+  });
   app.post("/api/mobile/capability-grants", async (req, res) => {
     const ctx = await requireMobileUser(req, res); if (!ctx) return res.status(401).json({ error: "Authentication required" });
     const parsed = capabilityGrantSchema.safeParse(req.body); if (!parsed.success) return res.status(400).json({ error: "Invalid capability grant." });
@@ -381,6 +459,8 @@ export function registerMobileApi(app: Express) {
         if (!ref.ok) throw new Error(`Source branch could not be read (HTTP ${ref.status}).`); const reference = await ref.json() as { object?: { sha?: string } }; if (!reference.object?.sha) throw new Error("GitHub did not return a source commit SHA.");
         const response = await fetch(`https://api.github.com/repos/${payload.repository}/git/refs`, { method: "POST", headers, body: JSON.stringify({ ref: `refs/heads/${payload.branch}`, sha: reference.object.sha }), signal: AbortSignal.timeout(15_000) });
         if (!response.ok) throw new Error(`Branch creation failed with HTTP ${response.status}.`); resultSummary = `Created branch ${payload.branch} from ${payload.fromBranch}.`;
+      } else if (payload.operation === "WRITE_WORKSPACE_FILE") {
+        resultSummary = await executeWorkspaceFileWrite({ repository: payload.repository, filePath: payload.filePath!, content: payload.content!, commitMessage: payload.title!, branch: payload.branch, expectedSha: payload.expectedSha, token: decryptSecret(connection.encryptedToken), });
       } else {
         const response = await fetch(`https://api.github.com/repos/${payload.repository}/pulls`, { method: "POST", headers, body: JSON.stringify({ title: payload.title, body: payload.body || "", head: payload.head, base: payload.base }), signal: AbortSignal.timeout(15_000) });
         if (!response.ok) throw new Error(`Pull-request creation failed with HTTP ${response.status}.`); const pull = await response.json() as { number?: number; html_url?: string }; resultSummary = `Created pull request #${pull.number ?? "?"}: ${pull.html_url ?? "GitHub confirmation returned."}`;

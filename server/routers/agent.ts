@@ -7,13 +7,13 @@ import { storageGetSignedUrl, storagePut } from "../storage";
 import { assertSafeProviderUrl, decryptSecret, encryptSecret, redactSecrets } from "../security";
 import { protectedProcedure, router } from "../_core/trpc";
 
-const toolDefinitions = [
-  { key: "web_search", label: "Web research", description: "Search and compare public web sources.", category: "Research", risk: "Low", version: "1", inputSchema: "query, public HTTPS sources", outputSchema: "cited source summary", networkRequired: true, timeoutSeconds: 45, retryStrategy: "bounded source retry", auditPolicy: "record query and source URLs" },
-  { key: "github", label: "GitHub", description: "Read repository context and prepare confirmation-gated changes.", category: "Engineering", risk: "Medium", version: "1", inputSchema: "repository and proposed operation", outputSchema: "repository context or operation record", networkRequired: true, timeoutSeconds: 45, retryStrategy: "no automatic writes", auditPolicy: "record proposal, confirmation, and outcome" },
-  { key: "code_executor", label: "Code executor", description: "Describe isolated code workflows after approval; a general production sandbox is not yet exposed.", category: "Engineering", risk: "High", version: "1", inputSchema: "approved workspace action", outputSchema: "verified execution result or unavailable state", networkRequired: false, timeoutSeconds: 60, retryStrategy: "user-approved retry only", auditPolicy: "record plan, evidence, and failure" },
-  { key: "document_reader", label: "Document reader", description: "Read user-selected or uploaded document context.", category: "Knowledge", risk: "Low", version: "1", inputSchema: "authorized document reference", outputSchema: "excerpt with source label", networkRequired: false, timeoutSeconds: 30, retryStrategy: "no content retry without consent", auditPolicy: "record document reference, not sensitive content" },
-  { key: "image_generation", label: "Image studio", description: "Create images through a configured provider.", category: "Creative", risk: "Medium", version: "1", inputSchema: "image prompt", outputSchema: "provider-generated asset URL", networkRequired: true, timeoutSeconds: 90, retryStrategy: "one provider retry", auditPolicy: "record provider and generation outcome" },
-  { key: "http_request", label: "API request", description: "Call an approved API endpoint with scoped credentials.", category: "Connectivity", risk: "High", version: "1", inputSchema: "approved endpoint and request", outputSchema: "redacted response summary", networkRequired: true, timeoutSeconds: 30, retryStrategy: "idempotent requests only", auditPolicy: "record endpoint host and outcome without secrets" },
+export const toolDefinitions = [
+  { key: "web_search", label: "Web research", description: "Search and compare public web sources.", category: "Research", risk: "Low", version: "1", inputSchema: "query, public HTTPS sources", outputSchema: "cited source summary", networkRequired: true, transmissionDisclosure: "Sends only owner-selected query text and public HTTPS source URLs to the configured research route.", timeoutSeconds: 45, retryStrategy: "bounded source retry", auditPolicy: "record query and source URLs" },
+  { key: "github", label: "GitHub", description: "Read repository context and prepare confirmation-gated changes.", category: "Engineering", risk: "Medium", version: "1", inputSchema: "repository and proposed operation", outputSchema: "repository context or operation record", networkRequired: true, transmissionDisclosure: "Sends a repository reference or explicitly selected pending operation to GitHub only after owner confirmation.", timeoutSeconds: 45, retryStrategy: "no automatic writes", auditPolicy: "record proposal, confirmation, and outcome" },
+  { key: "code_executor", label: "Code executor", description: "Describe isolated code workflows after approval; a general production sandbox is not yet exposed.", category: "Engineering", risk: "High", version: "1", inputSchema: "approved workspace action", outputSchema: "verified execution result or unavailable state", networkRequired: false, transmissionDisclosure: "No network transmission is performed by this registry entry.", timeoutSeconds: 60, retryStrategy: "user-approved retry only", auditPolicy: "record plan, evidence, and failure" },
+  { key: "document_reader", label: "Document reader", description: "Read user-selected or uploaded document context.", category: "Knowledge", risk: "Low", version: "1", inputSchema: "authorized document reference", outputSchema: "excerpt with source label", networkRequired: false, transmissionDisclosure: "No network transmission occurs for local documents; uploaded files use their separate visible confirmation.", timeoutSeconds: 30, retryStrategy: "no content retry without consent", auditPolicy: "record document reference, not sensitive content" },
+  { key: "image_generation", label: "Image studio", description: "Create images through a configured provider.", category: "Creative", risk: "Medium", version: "1", inputSchema: "image prompt", outputSchema: "provider-generated asset URL", networkRequired: true, transmissionDisclosure: "Sends the owner-approved image prompt to the selected optional image provider.", timeoutSeconds: 90, retryStrategy: "one provider retry", auditPolicy: "record provider and generation outcome" },
+  { key: "http_request", label: "API request", description: "Call an approved API endpoint with scoped credentials.", category: "Connectivity", risk: "High", version: "1", inputSchema: "approved endpoint and request", outputSchema: "redacted response summary", networkRequired: true, transmissionDisclosure: "Sends only the explicitly approved request to the selected public endpoint using scoped credentials.", timeoutSeconds: 30, retryStrategy: "idempotent requests only", auditPolicy: "record endpoint host and outcome without secrets" },
 ] as const;
 
 const taskPlanSchema = z.object({
@@ -29,6 +29,8 @@ const fallbackPlan = [
   { title: "Execute the scoped work", detail: "Use approved tools and preserve an auditable record.", toolKey: "code_executor" },
   { title: "Verify the result", detail: "Review the outcome and surface any user decision needed.", toolKey: "document_reader" },
 ];
+
+const knownToolKey = z.enum(["web_search", "github", "code_executor", "document_reader", "image_generation", "http_request"]);
 
 async function resolveModel(preferred?: string | null) {
   const catalog = await listLLMModels();
@@ -179,10 +181,12 @@ export const agentRouter = router({
       const evidence = redactSecrets(input.evidence);
       if (input.passed) {
         await db.updateTask(ctx.user.id, task.id, { status: "COMPLETED", completedAt: new Date(), finalResult: evidence });
+        await db.createTaskEvidence(ctx.user.id, { taskId: task.id, kind: "VERIFICATION", summary: "Verification passed", evidence, outcome: "COMPLETED" });
         await db.createActivity(ctx.user.id, { taskId: task.id, eventType: "TASK_VERIFIED", title: "Verification passed", detail: evidence, visibility: "ADVANCED" });
         return { status: "COMPLETED" as const };
       }
       await db.updateTask(ctx.user.id, task.id, { status: "FAILED", errorSummary: evidence });
+      await db.createTaskEvidence(ctx.user.id, { taskId: task.id, kind: "VERIFICATION", summary: "Verification failed", evidence, outcome: "FAILED" });
       await db.createActivity(ctx.user.id, { taskId: task.id, eventType: "TASK_VERIFICATION_FAILED", title: "Verification failed", detail: `${evidence}${input.nextAction ? ` Next action: ${redactSecrets(input.nextAction)}` : ""}`, visibility: "ADVANCED" });
       return { status: "FAILED" as const };
     }),
@@ -202,8 +206,62 @@ export const agentRouter = router({
       const task = requireRecord(await db.getTask(ctx.user.id, input.taskId));
       if (task.status !== "FAILED") throw new TRPCError({ code: "BAD_REQUEST", message: "Only a failed task can be retried." });
       await db.updateTask(ctx.user.id, input.taskId, { status: "PLANNING", retryCount: task.retryCount + 1, errorSummary: null, nextRetryAt: null });
-      await db.createActivity(ctx.user.id, { taskId: input.taskId, eventType: "TASK_RETRY", title: "Task retry requested", detail: `Retry ${task.retryCount + 1} will be planned again with the current permissions.` });
+      await db.createActivity(ctx.user.id, { taskId: task.id, eventType: "TASK_RETRY", title: "Task retry requested", detail: `Retry ${task.retryCount + 1} will be planned again with the current permissions.` });
       return { success: true, status: "PLANNING" as const };
+    }),
+    observe: protectedProcedure.input(z.object({ taskId: z.number().int().positive(), summary: z.string().trim().min(3).max(1000), evidence: z.string().trim().min(3).max(2000).optional() })).mutation(async ({ ctx, input }) => {
+      const task = requireRecord(await db.getTask(ctx.user.id, input.taskId));
+      if (["COMPLETED", "CANCELLED"].includes(task.status)) throw new TRPCError({ code: "BAD_REQUEST", message: "Closed tasks cannot accept further observations." });
+      const detail = `${redactSecrets(input.summary)}${input.evidence ? ` Evidence: ${redactSecrets(input.evidence)}` : ""}`;
+      await db.createTaskEvidence(ctx.user.id, { taskId: task.id, kind: "OBSERVATION", summary: redactSecrets(input.summary), evidence: input.evidence ? redactSecrets(input.evidence) : undefined, outcome: "COMPLETED" });
+      await db.createActivity(ctx.user.id, { taskId: task.id, eventType: "TASK_OBSERVATION", title: "Observation recorded", detail, visibility: "ADVANCED" });
+      return { success: true, status: task.status, conciseSummary: redactSecrets(input.summary) };
+    }),
+    selectTool: protectedProcedure.input(z.object({ taskId: z.number().int().positive(), toolKey: knownToolKey, rationale: z.string().trim().min(3).max(500) })).mutation(async ({ ctx, input }) => {
+      const task = requireRecord(await db.getTask(ctx.user.id, input.taskId));
+      if (!["RUNNING", "PLANNING", "WAITING_FOR_USER", "WAITING_FOR_TOOL"].includes(task.status)) throw new TRPCError({ code: "BAD_REQUEST", message: "A tool can only be selected for an active task." });
+      const policy = (await db.listToolPermissions(ctx.user.id)).find(item => item.toolKey === input.toolKey)?.policy ?? "ASK";
+      if (policy === "DENY") {
+        await db.createTaskEvidence(ctx.user.id, { taskId: task.id, kind: "TOOL_SELECTION", toolKey: input.toolKey, summary: "Tool denied by user policy", evidence: redactSecrets(input.rationale), outcome: "DECLINED" });
+        await db.createActivity(ctx.user.id, { taskId: task.id, eventType: "TOOL_DENIED", title: `Tool denied: ${input.toolKey}`, detail: "The user policy denies this tool. Choose another approach or update the policy." });
+        return { policy, status: task.status, requiresConfirmation: false };
+      }
+      const requiresConfirmation = policy === "ASK";
+      const status = requiresConfirmation ? "WAITING_FOR_USER" as const : "WAITING_FOR_TOOL" as const;
+      await db.updateTask(ctx.user.id, task.id, { status });
+      await db.createTaskEvidence(ctx.user.id, { taskId: task.id, kind: "TOOL_SELECTION", toolKey: input.toolKey, summary: redactSecrets(input.rationale), outcome: requiresConfirmation ? "PENDING" : "APPROVED" });
+      await db.createActivity(ctx.user.id, { taskId: task.id, eventType: requiresConfirmation ? "TOOL_CONFIRMATION_REQUIRED" : "TOOL_SELECTED", title: requiresConfirmation ? `Approval needed: ${input.toolKey}` : `Tool selected: ${input.toolKey}`, detail: redactSecrets(input.rationale), visibility: "ADVANCED" });
+      return { policy, status, requiresConfirmation };
+    }),
+    resolveToolApproval: protectedProcedure.input(z.object({ taskId: z.number().int().positive(), toolKey: knownToolKey, approved: z.boolean(), note: z.string().trim().min(3).max(500).optional() })).mutation(async ({ ctx, input }) => {
+      const task = requireRecord(await db.getTask(ctx.user.id, input.taskId));
+      if (task.status !== "WAITING_FOR_USER") throw new TRPCError({ code: "BAD_REQUEST", message: "This task is not awaiting a tool approval." });
+      const status = input.approved ? "WAITING_FOR_TOOL" as const : "RUNNING" as const;
+      await db.updateTask(ctx.user.id, task.id, { status });
+      await db.createTaskEvidence(ctx.user.id, { taskId: task.id, kind: "TOOL_APPROVAL", toolKey: input.toolKey, summary: input.note ? redactSecrets(input.note) : "No additional note provided.", outcome: input.approved ? "APPROVED" : "DECLINED" });
+      await db.createActivity(ctx.user.id, { taskId: task.id, eventType: input.approved ? "TOOL_APPROVED" : "TOOL_DECLINED", title: input.approved ? `Tool approved: ${input.toolKey}` : `Tool declined: ${input.toolKey}`, detail: input.note ? redactSecrets(input.note) : "No additional note provided." });
+      return { status, toolKey: input.toolKey };
+    }),
+    repair: protectedProcedure.input(z.object({ taskId: z.number().int().positive(), diagnosis: z.string().trim().min(3).max(1200), repairSteps: z.array(z.object({ title: z.string().trim().min(3).max(160), detail: z.string().trim().max(500).optional(), toolKey: knownToolKey.optional() })).min(1).max(4) })).mutation(async ({ ctx, input }) => {
+      const task = requireRecord(await db.getTask(ctx.user.id, input.taskId));
+      if (!["FAILED", "VERIFYING", "WAITING_FOR_TOOL"].includes(task.status)) throw new TRPCError({ code: "BAD_REQUEST", message: "A repair plan requires a failed, verifying, or tool-blocked task." });
+      const existingSteps = await db.listTaskSteps(task.id);
+      await db.appendTaskSteps(task.id, existingSteps.length, input.repairSteps);
+      await db.updateTask(ctx.user.id, task.id, { status: "RUNNING", errorSummary: null, retryCount: task.retryCount + 1 });
+      const updatedSteps = await db.listTaskSteps(task.id);
+      const next = updatedSteps.find(step => step.status === "PENDING");
+      if (next) await db.updateTaskStep(task.id, next.id, "RUNNING");
+      await db.createTaskEvidence(ctx.user.id, { taskId: task.id, kind: "REPAIR", summary: redactSecrets(input.diagnosis), evidence: input.repairSteps.map(step => step.title).join("; "), outcome: "APPROVED" });
+      await db.createActivity(ctx.user.id, { taskId: task.id, eventType: "TASK_REPAIR", title: "Repair plan started", detail: redactSecrets(input.diagnosis), visibility: "ADVANCED" });
+      return { status: "RUNNING" as const, repairStepCount: input.repairSteps.length };
+    }),
+    escalate: protectedProcedure.input(z.object({ taskId: z.number().int().positive(), level: z.enum(["INPUT", "PERMISSION", "PROVIDER", "HUMAN_REVIEW"]), summary: z.string().trim().min(3).max(800) })).mutation(async ({ ctx, input }) => {
+      const task = requireRecord(await db.getTask(ctx.user.id, input.taskId));
+      if (["COMPLETED", "CANCELLED"].includes(task.status)) throw new TRPCError({ code: "BAD_REQUEST", message: "Closed tasks cannot be escalated." });
+      await db.updateTask(ctx.user.id, task.id, { status: "WAITING_FOR_USER" });
+      await db.createTaskEvidence(ctx.user.id, { taskId: task.id, kind: "ESCALATION", summary: redactSecrets(input.summary), evidence: input.level, outcome: "PENDING" });
+      await db.createActivity(ctx.user.id, { taskId: task.id, eventType: "TASK_ESCALATED", title: `Escalation: ${input.level.toLowerCase().replace("_", " ")}`, detail: redactSecrets(input.summary) });
+      return { status: "WAITING_FOR_USER" as const, level: input.level };
     }),
     cancel: protectedProcedure.input(z.object({ taskId: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
       await db.updateTask(ctx.user.id, input.taskId, { status: "CANCELLED" });
@@ -227,6 +285,28 @@ export const agentRouter = router({
       await db.deleteMemory(ctx.user.id, input.memoryId);
       await db.createActivity(ctx.user.id, { eventType: "MEMORY_DELETED", title: "Memory deleted by user", visibility: "ADVANCED" });
       return { success: true };
+    }),
+  }),
+  improvements: router({
+    list: protectedProcedure.query(({ ctx }) => db.listImprovementRecords(ctx.user.id)),
+    propose: protectedProcedure.input(z.object({ scope: z.enum(["PROMPT", "TOOL", "WORKFLOW", "MODEL_ROUTING"]), title: z.string().trim().min(3).max(200), proposedChange: z.string().trim().min(5).max(5000), evidence: z.string().trim().min(3).max(5000), testOutcome: z.string().trim().min(3).max(3000), benchmarkSummary: z.string().trim().min(3).max(3000), versionLabel: z.string().trim().min(1).max(120) })).mutation(async ({ ctx, input }) => {
+      const record = requireRecord(await db.createImprovementRecord(ctx.user.id, { ...input, proposedChange: redactSecrets(input.proposedChange), evidence: redactSecrets(input.evidence), testOutcome: redactSecrets(input.testOutcome), benchmarkSummary: redactSecrets(input.benchmarkSummary) }));
+      await db.createActivity(ctx.user.id, { eventType: "IMPROVEMENT_PROPOSED", title: `Improvement proposed: ${record.title}`, detail: `Scope ${record.scope}; version ${record.versionLabel}; awaiting explicit review.`, visibility: "ADVANCED" });
+      return record;
+    }),
+    review: protectedProcedure.input(z.object({ recordId: z.number().int().positive(), decision: z.enum(["APPROVED", "REJECTED"]), note: z.string().trim().min(3).max(1500) })).mutation(async ({ ctx, input }) => {
+      const record = requireRecord(await db.getImprovementRecord(ctx.user.id, input.recordId));
+      if (record.status !== "PENDING") throw new TRPCError({ code: "BAD_REQUEST", message: "Only pending improvement records can be reviewed." });
+      await db.updateImprovementRecord(ctx.user.id, record.id, { status: input.decision, reviewNote: redactSecrets(input.note), approvedAt: input.decision === "APPROVED" ? new Date() : null });
+      await db.createActivity(ctx.user.id, { eventType: input.decision === "APPROVED" ? "IMPROVEMENT_APPROVED" : "IMPROVEMENT_REJECTED", title: `${input.decision === "APPROVED" ? "Approved" : "Rejected"} improvement: ${record.title}`, detail: redactSecrets(input.note), visibility: "ADVANCED" });
+      return { status: input.decision };
+    }),
+    rollback: protectedProcedure.input(z.object({ recordId: z.number().int().positive(), reason: z.string().trim().min(3).max(1500) })).mutation(async ({ ctx, input }) => {
+      const record = requireRecord(await db.getImprovementRecord(ctx.user.id, input.recordId));
+      if (record.status !== "APPROVED") throw new TRPCError({ code: "BAD_REQUEST", message: "Only approved improvement records can be rolled back." });
+      await db.updateImprovementRecord(ctx.user.id, record.id, { status: "ROLLED_BACK", reviewNote: redactSecrets(input.reason), rolledBackAt: new Date() });
+      await db.createActivity(ctx.user.id, { eventType: "IMPROVEMENT_ROLLED_BACK", title: `Rolled back improvement: ${record.title}`, detail: redactSecrets(input.reason), visibility: "ADVANCED" });
+      return { status: "ROLLED_BACK" as const };
     }),
   }),
   tools: router({
@@ -257,7 +337,7 @@ export const agentRouter = router({
     }),
   }),
   settings: router({
-    get: protectedProcedure.query(async ({ ctx }) => ({ provider: safeProvider(await db.latestProvider(ctx.user.id)), models: (await listLLMModels()).data.map(model => ({ id: model.id })) })),
+    get: protectedProcedure.query(async ({ ctx }) => { const provider = await db.latestProvider(ctx.user.id); return { provider: safeProvider(provider), modelCapabilities: db.describeProviderCapabilities(provider), models: (await listLLMModels()).data.map(model => ({ id: model.id })) }; }),
     saveProvider: protectedProcedure.input(z.object({ name: z.string().trim().min(2).max(120), providerType: z.enum(["BUILT_IN", "OPENAI_COMPATIBLE"]), baseUrl: z.string().url().optional(), activeModel: z.string().max(160).optional(), apiKey: z.string().min(8).max(1000).optional(), costMode: z.enum(["LOCAL_ONLY", "BALANCED", "POWER"]) })).mutation(async ({ ctx, input }) => {
       if (input.providerType === "OPENAI_COMPATIBLE" && !input.apiKey) throw new TRPCError({ code: "BAD_REQUEST", message: "An API key is required for an OpenAI-compatible provider." });
       const provider = await db.saveProvider(ctx.user.id, { ...input, encryptedApiKey: input.apiKey ? encryptSecret(input.apiKey) : undefined });

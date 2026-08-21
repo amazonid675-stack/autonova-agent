@@ -78,6 +78,18 @@ export const taskSteps = mysqlTable("taskSteps", {
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
 
+export const taskEvidenceRecords = mysqlTable("taskEvidenceRecords", {
+  id: int("id").autoincrement().primaryKey(),
+  taskId: int("taskId").notNull().references(() => agentTasks.id, { onDelete: "cascade" }),
+  userId: int("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
+  kind: mysqlEnum("kind", ["OBSERVATION", "TOOL_SELECTION", "TOOL_APPROVAL", "TOOL_OUTCOME", "VERIFICATION", "REPAIR", "ESCALATION"]).notNull(),
+  toolKey: varchar("toolKey", { length: 80 }),
+  summary: text("summary").notNull(),
+  evidence: text("evidence"),
+  outcome: mysqlEnum("outcome", ["PENDING", "APPROVED", "COMPLETED", "FAILED", "DECLINED"]).default("PENDING").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
 export const memories = mysqlTable("memories", {
   id: int("id").autoincrement().primaryKey(),
   userId: int("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
@@ -214,6 +226,24 @@ export const learningCandidates = mysqlTable("learningCandidates", {
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
 
+export const improvementRecords = mysqlTable("improvementRecords", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
+  scope: mysqlEnum("scope", ["PROMPT", "TOOL", "WORKFLOW", "MODEL_ROUTING"]).notNull(),
+  title: varchar("title", { length: 200 }).notNull(),
+  proposedChange: text("proposedChange").notNull(),
+  evidence: text("evidence").notNull(),
+  testOutcome: text("testOutcome"),
+  benchmarkSummary: text("benchmarkSummary"),
+  versionLabel: varchar("versionLabel", { length: 120 }).notNull(),
+  status: mysqlEnum("status", ["PENDING", "APPROVED", "REJECTED", "ROLLED_BACK"]).default("PENDING").notNull(),
+  reviewNote: text("reviewNote"),
+  approvedAt: timestamp("approvedAt"),
+  rolledBackAt: timestamp("rolledBackAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
 export const capabilityGrants = mysqlTable("capabilityGrants", {
   id: int("id").autoincrement().primaryKey(),
   userId: int("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
@@ -244,7 +274,7 @@ export const githubOperationRequests = mysqlTable("githubOperationRequests", {
   userId: int("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
   capabilityGrantId: int("capabilityGrantId").references(() => capabilityGrants.id, { onDelete: "set null" }),
   repository: varchar("repository", { length: 255 }).notNull(),
-  operation: mysqlEnum("operation", ["CREATE_ISSUE", "CREATE_BRANCH", "CREATE_PULL_REQUEST"]).notNull(),
+  operation: mysqlEnum("operation", ["CREATE_ISSUE", "CREATE_BRANCH", "CREATE_PULL_REQUEST", "WRITE_WORKSPACE_FILE"]).notNull(),
   payload: text("payload").notNull(),
   status: mysqlEnum("status", ["PENDING", "APPROVED", "COMPLETED", "FAILED", "CANCELLED"]).default("PENDING").notNull(),
   resultSummary: text("resultSummary"),

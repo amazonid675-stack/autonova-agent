@@ -35,6 +35,7 @@ class VoiceAssistant(private val context: Context) : TextToSpeech.OnInitListener
     private var pendingSpeech: String? = null
     override fun onInit(status: Int) { ready = status == TextToSpeech.SUCCESS; if (ready) { textToSpeech?.language = Locale.getDefault(); pendingSpeech?.let { textToSpeech?.speak(it, TextToSpeech.QUEUE_FLUSH, null, UUID.randomUUID().toString()) }; pendingSpeech = null } }
     fun listen(onPartial: (String) -> Unit, onFinal: (String) -> Unit, onError: (String) -> Unit) {
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) { onError("Microphone permission is required before voice input can start."); return }
         if (!SpeechRecognizer.isRecognitionAvailable(context)) { onError("Speech recognition is unavailable on this device."); return }
         val recognizer = SpeechRecognizer.createSpeechRecognizer(context)
         recognizer.setRecognitionListener(object : RecognitionListener {

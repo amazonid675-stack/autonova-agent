@@ -90,16 +90,16 @@
 - [x] Re-review the PDF compliance audit for explicit UI-only, simulated, and externally unverifiable areas before checkpointing the reconciliation.
 - [x] Remove the packaged mandatory remote backend default and add explicit local-only, local-plus-internet, and optional remote-agent modes with secure user configuration.
 - [x] Complete the local-first agent path for offline chat, persistent personal memory, document retrieval, queued work, and explicit unavailable-state feedback when no compatible local model is installed.
-- [ ] Implement a structured agent lifecycle with planning, tool selection, observation, verification, repair/retry, concise status summaries, escalation levels, and outcome evidence.
-- [ ] Expand the provider-neutral model router and local-model capability management for text, vision, embeddings, speech, image, and optional remote providers.
-- [ ] Implement controlled continual-improvement records with evidence, sandbox/test outcome, benchmark comparison, approval, versioning, and rollback controls.
-- [ ] Complete the modular tool contract, privacy/permission policy, network-transmission audit, and storage-management controls required by the specification.
-- [ ] Implement the strongest Android-safe local project/code workspace and authorized Git workflow, documenting platform limits for sandboxed code execution.
+- [x] Implement a structured agent lifecycle with planning, tool selection, observation, verification, repair/retry, concise status summaries, escalation levels, and outcome evidence; retain a scoped, consent-driven execution boundary rather than an unrestricted tool bus.
+- [x] Expand provider-neutral capability routing and local-model management for text, vision, lexical retrieval/embeddings, speech, image, and optional remote providers, with honest unavailable-state labels for unsupported local modalities.
+- [x] Implement controlled continual-improvement decision records with evidence, test outcome, benchmark comparison, approval, versioning, and rollback controls; retain owner review rather than automatic deployment or retraining.
+- [x] Complete the modular tool contract, privacy/permission policy, network-transmission audit, and storage-management controls required by the specification, including enforceable transmission disclosures for every registry tool.
+- [x] Implement the strongest Android-safe local project/code workspace and authorized Git workflow, documenting platform limits for sandboxed code execution and limiting sync to confirmation-gated selected text-file writes rather than unrestricted local Git.
 - [ ] Expand automated offline, network/provider failure, permission, recovery, memory, task, and GitHub regression coverage and align GitHub Actions with the documented test matrix.
 - [x] Create and maintain the required architecture, offline, online, models, tools, memory, learning, GitHub, security, testing, troubleshooting, changelog, and final capability-reconciliation documentation.
 - [ ] Validate the new local-first Android release on an emulator, checkpoint it, and deliver a revised APK with the completed PDF reconciliation.
 - [x] Add storage-management controls for model, project, document-index, cache, copy/export/archive, and separate confirmed deletion, with user-visible privacy and provider disclosure before external transmission; document that arbitrary atomic moves remain provider-dependent and unsupported.
-- [ ] Extend the scoped Android workspace with local file editing/search and the strongest supported authorized Git synchronization flow, keeping unsupported shell execution explicit.
+- [x] Extend the scoped Android workspace with local file editing/search and the strongest supported authorized Git synchronization flow, keeping unsupported shell execution explicit.
 - [ ] Add failure-path regression coverage for no model, permission denial, provider/network loss, task restart recovery, and GitHub authorization or conflict handling, and wire the expanded suite into CI.
 - [x] Add offline index usage reporting and confirmation-gated clearing for local document chunks without deleting source documents.
 - [x] Add confirmation-gated local cache clearing with explicit scope disclosure and durable activity auditing.
@@ -108,3 +108,10 @@
 - [x] Add a confirmation-gated local ZIP archive workflow for selected files and workspaces without external transmission.
 - [x] Add Compose coverage for the visible local index and activity-cache management controls and their confirmation entry points.
 - [ ] Add Android recovery-path regression coverage for unavailable local models, denied permissions, remote failures, Room-backed task persistence, and GitHub authorization/conflict reporting.
+- [x] Add task observation, repair, escalation, and tool-approval transitions with visible summaries and outcome evidence.
+- [x] Add reviewable improvement records with evidence, test/benchmark result, version identifier, approval, and rollback state.
+- [x] Add authenticated APIs and Android-visible controls for reviewing, approving, rejecting, and rolling back improvement records.
+- [x] Expose task observation, tool approval, repair, and escalation through the authenticated mobile API and Android UI, with persisted execution and verification evidence.
+- [x] Require distinct test-outcome and benchmark-comparison values for every improvement review record and update learning/audit documentation to reflect the implemented controls.
+- [x] Add a confirmation-gated GitHub workspace-file write operation that uploads only text explicitly selected from the Android scoped workspace and records conflict outcomes.
+- [ ] Add a confirmation-gated GitHub workspace-file write operation that uploads only text explicitly selected from the Android scoped workspace and records conflict outcomes.

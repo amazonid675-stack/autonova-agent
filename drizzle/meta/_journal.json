@@ -57,6 +57,27 @@
       "when": 1787289052696,
       "tag": "0007_complete_skaar",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "5",
+      "when": 1787307246525,
+      "tag": "0008_outstanding_meteorite",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "5",
+      "when": 1787307637581,
+      "tag": "0009_yellow_ezekiel",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "5",
+      "when": 1787308259902,
+      "tag": "0010_groovy_black_crow",
+      "breakpoints": true
     }
   ]
 }

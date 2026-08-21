@@ -46,6 +46,13 @@ describe("agent security boundaries", () => {
     }));
     await expect(caller.agent.tools.setPermission({ toolKey: "unknown_tool" as never, policy: "ALLOW" })).rejects.toMatchObject({ code: "BAD_REQUEST" });
   });
+
+  it("rejects an invalid lifecycle tool selection before a task transition", async () => {
+    const caller = appRouter.createCaller(context({
+      id: 1, openId: "test-user", name: "Test User", email: "test@example.com", loginMethod: "manus", role: "user", createdAt: new Date(), updatedAt: new Date(), lastSignedIn: new Date(),
+    }));
+    await expect(caller.agent.tasks.selectTool({ taskId: 1, toolKey: "unbounded_shell" as never, rationale: "Attempt an unbounded tool action" })).rejects.toMatchObject({ code: "BAD_REQUEST" });
+  });
 });
 
 describe("secret redaction", () => {

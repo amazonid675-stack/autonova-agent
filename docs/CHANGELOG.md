@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.6.0 — Evidence-led local-first agent operations
+
+- Added durable task-evidence records plus Android task controls for observations, consent-aware tool selection and approval, repair, escalation, and evidence-backed verification.
+- Added controlled improvement records requiring separate evidence, test outcome, benchmark comparison, version label, owner review, and rollback history; these records do not auto-deploy or retrain a model.
+- Added a provider-neutral capability matrix that distinguishes local model requirements, Android services, lexical retrieval, and optional remote-provider routes for text, vision, embeddings, speech, and image capabilities.
+- Added enforced registry metadata and transmission disclosures for every tool, including version, schemas, network state, timeout, retry, and audit policy.
+- Added confirmation-gated GitHub write support for one explicitly selected scoped-workspace text file, conflict guidance, and test coverage; this is not unrestricted phone-side Git execution.
+- Added microphone-permission fail-closed behavior and expanded provider, GitHub, tool-contract, recovery, and workspace-write regression coverage.
+
 ## 0.5.0 — Scoped workspace and local storage controls
 
 - Added local document-index usage reporting and confirmation-gated clearing that preserves source documents.

@@ -7,6 +7,7 @@ import {
   conversations,
   githubConnections,
   githubOperationRequests,
+  improvementRecords,
   InsertUser,
   learningCandidates,
   memories,
@@ -17,6 +18,7 @@ import {
   providerConfigs,
   researchSessions,
   researchSources,
+  taskEvidenceRecords,
   taskSteps,
   toolPermissions,
   uploadedFiles,
@@ -177,10 +179,31 @@ export async function createTaskSteps(taskId: number, steps: Array<{ title: stri
   await db.insert(taskSteps).values(steps.map((step, index) => ({ taskId, position: index + 1, title: step.title, detail: step.detail ?? null, toolKey: step.toolKey ?? null })));
 }
 
+export async function appendTaskSteps(taskId: number, startPosition: number, steps: Array<{ title: string; detail?: string; toolKey?: string }>) {
+  const db = await getDb();
+  if (!db || !steps.length) return;
+  await db.insert(taskSteps).values(steps.map((step, index) => ({ taskId, position: startPosition + index + 1, title: step.title, detail: step.detail ?? null, toolKey: step.toolKey ?? null })));
+}
+
 export async function updateTaskStep(taskId: number, stepId: number, status: "PENDING" | "RUNNING" | "COMPLETED" | "FAILED" | "SKIPPED") {
   const db = await getDb();
   if (!db) return;
   await db.update(taskSteps).set({ status, updatedAt: new Date() }).where(and(eq(taskSteps.id, stepId), eq(taskSteps.taskId, taskId)));
+}
+
+export async function createTaskEvidence(userId: number, input: { taskId: number; kind: "OBSERVATION" | "TOOL_SELECTION" | "TOOL_APPROVAL" | "TOOL_OUTCOME" | "VERIFICATION" | "REPAIR" | "ESCALATION"; toolKey?: string; summary: string; evidence?: string; outcome?: "PENDING" | "APPROVED" | "COMPLETED" | "FAILED" | "DECLINED" }) {
+  const db = await getDb();
+  if (!db) return null;
+  await db.insert(taskEvidenceRecords).values({ userId, taskId: input.taskId, kind: input.kind, toolKey: input.toolKey ?? null, summary: input.summary, evidence: input.evidence ?? null, outcome: input.outcome ?? "PENDING" });
+  const rows = await db.select().from(taskEvidenceRecords).where(and(eq(taskEvidenceRecords.userId, userId), eq(taskEvidenceRecords.taskId, input.taskId))).orderBy(desc(taskEvidenceRecords.id)).limit(1);
+  return rows[0] ?? null;
+}
+
+export async function listTaskEvidence(userId: number, taskId?: number) {
+  const db = await getDb();
+  if (!db) return [];
+  const condition = taskId ? and(eq(taskEvidenceRecords.userId, userId), eq(taskEvidenceRecords.taskId, taskId)) : eq(taskEvidenceRecords.userId, userId);
+  return db.select().from(taskEvidenceRecords).where(condition).orderBy(desc(taskEvidenceRecords.createdAt)).limit(160);
 }
 
 export async function listMemories(userId: number, projectId?: number) {
@@ -260,6 +283,17 @@ export async function latestProvider(userId: number) {
   if (!db) return null;
   const rows = await db.select().from(providerConfigs).where(and(eq(providerConfigs.userId, userId), eq(providerConfigs.isActive, 1))).orderBy(desc(providerConfigs.updatedAt)).limit(1);
   return rows[0] ?? null;
+}
+
+export function describeProviderCapabilities(provider: { providerType: "BUILT_IN" | "OPENAI_COMPATIBLE"; activeModel: string | null; costMode: "LOCAL_ONLY" | "BALANCED" | "POWER" } | null) {
+  const remoteConfigured = Boolean(provider && provider.costMode !== "LOCAL_ONLY" && provider.activeModel);
+  return [
+    { modality: "TEXT", route: remoteConfigured ? "OPTIONAL_REMOTE" : "LOCAL_DEVICE", availability: remoteConfigured ? "CONFIGURED" : "REQUIRES_LOCAL_MODEL", note: remoteConfigured ? "Configured remote text model is optional; Android local model remains the offline path." : "Requires an imported compatible Android local model." },
+    { modality: "VISION", route: "LOCAL_OR_REMOTE", availability: "REQUIRES_COMPATIBLE_MODEL", note: "Camera and screenshot capture are device-native; understanding requires a compatible local vision model or explicit optional remote analysis." },
+    { modality: "EMBEDDINGS", route: "LOCAL_DEVICE", availability: "LEXICAL_FALLBACK", note: "Local document retrieval uses lexical chunks; vector embeddings require a compatible user-supplied embedding provider." },
+    { modality: "SPEECH", route: "ANDROID_SERVICE", availability: "DEVICE_DEPENDENT", note: "Speech recognition and TTS use Android-installed services and may be offline or provider-dependent." },
+    { modality: "IMAGE", route: "OPTIONAL_REMOTE", availability: remoteConfigured ? "PROVIDER_DEPENDENT" : "NOT_CONFIGURED", note: "Image generation requires an explicitly connected provider; no image model is bundled in the APK." },
+  ];
 }
 
 export async function saveProvider(userId: number, input: { name: string; providerType: "BUILT_IN" | "OPENAI_COMPATIBLE"; baseUrl?: string; activeModel?: string; encryptedApiKey?: string; costMode: "LOCAL_ONLY" | "BALANCED" | "POWER" }) {
@@ -351,6 +385,33 @@ export async function updateLearningCandidate(userId: number, candidateId: numbe
   await db.update(learningCandidates).set({ ...values, updatedAt: new Date() }).where(and(eq(learningCandidates.id, candidateId), eq(learningCandidates.userId, userId)));
 }
 
+export async function createImprovementRecord(userId: number, input: { scope: "PROMPT" | "TOOL" | "WORKFLOW" | "MODEL_ROUTING"; title: string; proposedChange: string; evidence: string; testOutcome?: string; benchmarkSummary?: string; versionLabel: string }) {
+  const db = await getDb();
+  if (!db) return null;
+  await db.insert(improvementRecords).values({ userId, ...input, testOutcome: input.testOutcome ?? null, benchmarkSummary: input.benchmarkSummary ?? null });
+  const rows = await db.select().from(improvementRecords).where(and(eq(improvementRecords.userId, userId), eq(improvementRecords.title, input.title), eq(improvementRecords.versionLabel, input.versionLabel))).orderBy(desc(improvementRecords.id)).limit(1);
+  return rows[0] ?? null;
+}
+
+export async function listImprovementRecords(userId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(improvementRecords).where(eq(improvementRecords.userId, userId)).orderBy(desc(improvementRecords.updatedAt)).limit(80);
+}
+
+export async function getImprovementRecord(userId: number, recordId: number) {
+  const db = await getDb();
+  if (!db) return null;
+  const rows = await db.select().from(improvementRecords).where(and(eq(improvementRecords.id, recordId), eq(improvementRecords.userId, userId))).limit(1);
+  return rows[0] ?? null;
+}
+
+export async function updateImprovementRecord(userId: number, recordId: number, values: Partial<{ status: "PENDING" | "APPROVED" | "REJECTED" | "ROLLED_BACK"; reviewNote: string | null; approvedAt: Date | null; rolledBackAt: Date | null }>) {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(improvementRecords).set({ ...values, updatedAt: new Date() }).where(and(eq(improvementRecords.id, recordId), eq(improvementRecords.userId, userId)));
+}
+
 export async function createCapabilityGrant(userId: number, input: { capability: string; scope: string; rationale?: string; outcome?: string; expiresAt?: Date | null }) {
   const db = await getDb();
   if (!db) return null;
@@ -392,7 +453,7 @@ export async function deleteGitHubConnection(userId: number) {
   await db.delete(githubConnections).where(eq(githubConnections.userId, userId));
 }
 
-export async function createGitHubOperationRequest(userId: number, input: { repository: string; operation: "CREATE_ISSUE" | "CREATE_BRANCH" | "CREATE_PULL_REQUEST"; payload: string; capabilityGrantId?: number }) {
+export async function createGitHubOperationRequest(userId: number, input: { repository: string; operation: "CREATE_ISSUE" | "CREATE_BRANCH" | "CREATE_PULL_REQUEST" | "WRITE_WORKSPACE_FILE"; payload: string; capabilityGrantId?: number }) {
   const db = await getDb();
   if (!db) return null;
   await db.insert(githubOperationRequests).values({ userId, ...input, capabilityGrantId: input.capabilityGrantId ?? null });
@@ -420,6 +481,6 @@ export async function updateGitHubOperationRequest(userId: number, requestId: nu
 }
 
 export async function mobileBootstrap(userId: number) {
-  const [projectList, taskList, memoryList, activityList, fileList, permissions, provider, research, candidates, grants, githubConnection, githubOperations] = await Promise.all([listProjects(userId), listTasks(userId), listMemories(userId), listActivity(userId), listUploadedFiles(userId), listToolPermissions(userId), latestProvider(userId), listResearchSessions(userId), listLearningCandidates(userId), listCapabilityGrants(userId), getGitHubConnection(userId), listGitHubOperationRequests(userId)]);
-  return { projects: projectList, tasks: taskList, memories: memoryList, activity: activityList, files: fileList, toolPermissions: permissions, provider: provider ? { name: provider.name, providerType: provider.providerType, activeModel: provider.activeModel, costMode: provider.costMode, hasApiKey: Boolean(provider.encryptedApiKey) } : null, research, learningCandidates: candidates, capabilityGrants: grants, githubConnection: githubConnection ? { login: githubConnection.login, scopes: githubConnection.scopes } : null, githubOperations };
+  const [projectList, taskList, memoryList, activityList, fileList, permissions, provider, research, candidates, grants, githubConnection, githubOperations, improvements, taskEvidence] = await Promise.all([listProjects(userId), listTasks(userId), listMemories(userId), listActivity(userId), listUploadedFiles(userId), listToolPermissions(userId), latestProvider(userId), listResearchSessions(userId), listLearningCandidates(userId), listCapabilityGrants(userId), getGitHubConnection(userId), listGitHubOperationRequests(userId), listImprovementRecords(userId), listTaskEvidence(userId)]);
+  return { projects: projectList, tasks: taskList, memories: memoryList, activity: activityList, files: fileList, toolPermissions: permissions, provider: provider ? { name: provider.name, providerType: provider.providerType, activeModel: provider.activeModel, costMode: provider.costMode, hasApiKey: Boolean(provider.encryptedApiKey) } : null, modelCapabilities: describeProviderCapabilities(provider), research, learningCandidates: candidates, capabilityGrants: grants, githubConnection: githubConnection ? { login: githubConnection.login, scopes: githubConnection.scopes } : null, githubOperations, improvements, taskEvidence };
 }
