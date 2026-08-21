@@ -14,11 +14,14 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -92,7 +95,7 @@ internal sealed interface LocalStorageAction {
 @Composable fun AutonovaApp(viewModel: AutonovaViewModel = viewModel()) {
     var section by remember { mutableStateOf("Command") }
     val feedback by viewModel.feedback.collectAsState()
-    MaterialTheme(colorScheme = MaterialTheme.colorScheme.copy(background = Ink, surface = Panel, primary = Lavender, onPrimary = Ink, onBackground = Cloud, onSurface = Cloud)) {
+    MaterialTheme(colorScheme = MaterialTheme.colorScheme.copy(background = Ink, surface = Panel, surfaceVariant = Panel, primary = Lavender, onPrimary = Ink, onBackground = Cloud, onSurface = Cloud, onSurfaceVariant = Muted, outline = Muted)) {
         Scaffold(containerColor = Ink, bottomBar = { MobileNavigation(section) { section = it } }) { padding ->
             Column(Modifier.fillMaxSize().padding(padding)) {
                 feedback?.let { FeedbackBanner(it, viewModel::clearFeedback) }
@@ -112,15 +115,15 @@ internal sealed interface LocalStorageAction {
 
 @Composable private fun MobileNavigation(selected: String, onSelect: (String) -> Unit) {
     NavigationBar(containerColor = Panel) {
-        listOf("Command" to Icons.Outlined.Home, "Tasks" to Icons.Outlined.AutoAwesome, "Projects" to Icons.Outlined.Folder, "Memory" to Icons.Outlined.Memory, "More" to Icons.Outlined.MoreHoriz).forEach { (label, icon) ->
-            NavigationBarItem(selected = label == selected, onClick = { onSelect(label) }, icon = { Icon(icon, label) }, label = { Text(label) })
+        listOf(Triple("Command", "Home", Icons.Outlined.Home), Triple("Tasks", "Tasks", Icons.Outlined.AutoAwesome), Triple("Projects", "Projects", Icons.Outlined.Folder), Triple("Memory", "Memory", Icons.Outlined.Memory), Triple("More", "More", Icons.Outlined.MoreHoriz)).forEach { (section, label, icon) ->
+            NavigationBarItem(selected = section == selected, onClick = { onSelect(section) }, icon = { Icon(icon, label) }, label = { Text(label) })
         }
     }
 }
 
 @Composable private fun PageHeader(kicker: String, title: String, detail: String? = null) {
     Text(kicker.uppercase(), color = Lavender, style = MaterialTheme.typography.labelSmall)
-    Text(title, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+    Text(title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
     detail?.let { Text(it, color = Muted, style = MaterialTheme.typography.bodySmall) }
 }
 
@@ -135,8 +138,9 @@ internal sealed interface LocalStorageAction {
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable private fun CommandScreen(viewModel: AutonovaViewModel, modifier: Modifier) {
-    val messages by viewModel.messages.collectAsState(); val configured by viewModel.configured.collectAsState(); val connectionState by viewModel.connectionState.collectAsState(); val context = LocalContext.current; var draft by remember { mutableStateOf("") }; var confirmClipboard by remember { mutableStateOf<String?>(null) }
+    val messages by viewModel.messages.collectAsState(); val configured by viewModel.configured.collectAsState(); val connectionState by viewModel.connectionState.collectAsState(); val operatingMode by viewModel.operatingMode.collectAsState(); val context = LocalContext.current; var draft by remember { mutableStateOf("") }; var confirmClipboard by remember { mutableStateOf<String?>(null) }
     val voice = remember(context) { VoiceAssistant(context) }
     val screenshotCapture = remember(context) { ScreenshotCapture(context) }
     DisposableEffect(voice) { onDispose { voice.close() } }
@@ -145,17 +149,21 @@ internal sealed interface LocalStorageAction {
     val cameraPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted -> if (granted) camera.launch(null) else viewModel.showError("Camera permission is required before taking a picture.") }
     val photoPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri -> uri?.let { uploadSelectedVisual(context, it, "image", viewModel) } }
     val screenshotConsent = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result -> screenshotCapture.capture(result.resultCode, result.data) { bytes -> bytes.onSuccess { viewModel.uploadDeviceContext("screenshot-${System.currentTimeMillis()}.jpg", "image/jpeg", it) }.onFailure { viewModel.showError(it.message ?: "Screenshot capture failed.") } } }
-    Column(modifier.fillMaxSize().padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        PageHeader("Personal agent workspace", "Command center", if (configured) "Autonova is connected to your selected optional remote agent. Responses and task updates appear as they stream." else "Start a local request now. Import an on-device model for private reasoning, or explicitly enable optional remote tools in Settings.")
+    Column(modifier.fillMaxSize().imePadding().padding(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        PageHeader("Personal agent workspace", "Command center", if (configured) "Your optional remote agent is connected. Responses and task updates appear here." else "Local projects, memories, tasks, and document storage work now. Private offline answers need a compatible local model.")
         if (!configured) SurfaceCard {
-            Text("Optional remote agent", color = Lavender, style = MaterialTheme.typography.labelSmall)
-            Text("Sign in securely in your browser. You never need to paste an endpoint or session cookie.", color = Muted, style = MaterialTheme.typography.bodySmall)
-            Button(onClick = { CustomTabsIntent.Builder().build().launchUrl(context, Uri.parse(viewModel.beginMobileSignIn())) }) { Text(if (connectionState == ConnectionState.CONNECTING) "Continue sign-in" else "Connect Autonova") }
-        } else AssistChip(onClick = { viewModel.refresh() }, label = { Text("Agent connected") })
+            Text("Start working locally", color = Lavender, style = MaterialTheme.typography.labelSmall)
+            Text("You can create a project, memory, or task without signing in. Prompts are saved locally; import a compatible `.task` model from More → Device capabilities to receive private offline answers.", color = Muted, style = MaterialTheme.typography.bodySmall)
+            Text(viewModel.localModelStatus(), color = if (viewModel.localModelReady()) Color(0xFF8FE6BE) else Muted, style = MaterialTheme.typography.bodySmall)
+            if (operatingMode == OperatingMode.OPTIONAL_REMOTE_AGENT) {
+                Text("Remote work is optional. Sign in only if you choose to use your configured remote agent.", color = Muted, style = MaterialTheme.typography.bodySmall)
+                Button(onClick = { viewModel.beginMobileSignIn()?.let { CustomTabsIntent.Builder().build().launchUrl(context, Uri.parse(it)) } }) { Text(if (connectionState == ConnectionState.CONNECTING) "Continue sign-in" else "Connect optional agent") }
+            }
+        } else AssistChip(onClick = { viewModel.refresh() }, label = { Text("Optional agent connected") })
         SurfaceCard {
             Text("Device inputs", color = Lavender, style = MaterialTheme.typography.labelSmall)
             Text("Voice, camera, screenshots, files, shared items, URLs, and clipboard content become agent context only after you choose an action.", color = Muted, style = MaterialTheme.typography.bodySmall)
-            Row { TextButton(onClick = { microphonePermission.launch(Manifest.permission.RECORD_AUDIO) }) { Text("Voice") }; TextButton(onClick = { cameraPermission.launch(Manifest.permission.CAMERA) }) { Text("Camera") }; TextButton(onClick = { photoPicker.launch("image/*") }) { Text("Image") }; TextButton(onClick = { screenshotConsent.launch(screenshotCapture.consentIntent()) }) { Text("Screenshot") }; TextButton(onClick = { val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager; val clip = clipboard.primaryClip; val text = if (clip != null && clip.description.hasMimeType(ClipDescription.MIMETYPE_TEXT_PLAIN)) clip.getItemAt(0).coerceToText(context).toString() else ""; confirmClipboard = text.ifBlank { null }; if (text.isBlank()) viewModel.showError("Clipboard does not contain text to import.") }) { Text("Clipboard") } }
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(2.dp), verticalArrangement = Arrangement.spacedBy(0.dp)) { TextButton(onClick = { microphonePermission.launch(Manifest.permission.RECORD_AUDIO) }) { Text("Voice") }; TextButton(onClick = { cameraPermission.launch(Manifest.permission.CAMERA) }) { Text("Camera") }; TextButton(onClick = { photoPicker.launch("image/*") }) { Text("Image") }; TextButton(onClick = { screenshotConsent.launch(screenshotCapture.consentIntent()) }) { Text("Screenshot") }; TextButton(onClick = { val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager; val clip = clipboard.primaryClip; val text = if (clip != null && clip.description.hasMimeType(ClipDescription.MIMETYPE_TEXT_PLAIN)) clip.getItemAt(0).coerceToText(context).toString() else ""; confirmClipboard = text.ifBlank { null }; if (text.isBlank()) viewModel.showError("Clipboard does not contain text to import.") }) { Text("Clipboard") } }
         }
         Card(colors = CardDefaults.cardColors(containerColor = Panel), modifier = Modifier.weight(1f).fillMaxWidth()) {
             if (messages.isEmpty()) Column(Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
@@ -166,10 +174,12 @@ internal sealed interface LocalStorageAction {
                 }
             }
         }
+        Text("Prompt", color = Lavender, style = MaterialTheme.typography.labelSmall)
         Row(verticalAlignment = Alignment.CenterVertically) {
-            OutlinedTextField(value = draft, onValueChange = { draft = it }, modifier = Modifier.weight(1f), placeholder = { Text("Give Autonova a task or question…") }, minLines = 1, maxLines = 4)
-            Spacer(Modifier.width(8.dp)); Button(onClick = { viewModel.submit(draft); draft = "" }, enabled = draft.isNotBlank()) { Text("Send") }
+            OutlinedTextField(value = draft, onValueChange = { draft = it }, modifier = Modifier.weight(1f), label = { Text("Give Autonova a task or question") }, placeholder = { Text("Example: Plan my week") }, minLines = 1, maxLines = 3)
+            Spacer(Modifier.width(8.dp)); Button(onClick = { val request = draft.trim(); if (request.isBlank()) viewModel.showError("Write a prompt before sending it.") else { viewModel.submit(request); draft = "" } }) { Text("Send") }
         }
+        Text(if (configured) "Your prompt will use the connected optional agent." else "Your prompt is saved locally. Without an imported model, Autonova will explain the next setup step instead of pretending it completed an answer.", color = Muted, style = MaterialTheme.typography.bodySmall)
         if (messages.lastOrNull()?.role == "assistant") TextButton(onClick = { if (!voice.speak(messages.last().content)) viewModel.showError("Voice output is unavailable on this device.") }) { Text("Read latest response aloud") }
     }
     confirmClipboard?.let { text -> ConfirmDialog("Import clipboard text?", "This sends the selected clipboard text to your agent workspace.", "Import", { viewModel.recordDeviceAction("clipboard.import", "User confirmed importing clipboard text into the agent workspace."); viewModel.submit("Clipboard context from Android:\n$text"); confirmClipboard = null }) { confirmClipboard = null } }
@@ -180,7 +190,8 @@ internal sealed interface LocalStorageAction {
     Column(modifier.fillMaxSize().padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         PageHeader("Agent task engine", "Tasks", "Create protected tasks, then observe planning, execution, verification, and completion from the same workspace.")
         Row(verticalAlignment = Alignment.CenterVertically) { OutlinedTextField(value = request, onValueChange = { request = it }, modifier = Modifier.weight(1f), label = { Text("New task") }); Spacer(Modifier.width(8.dp)); Button(onClick = { viewModel.createTask(request); request = "" }, enabled = request.isNotBlank()) { Text("Create") } }
-        if (tasks.isEmpty()) Text("No synchronized tasks yet.", color = Muted) else LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) { items(tasks, key = { it.id }) { task ->
+        Text("Tasks created here are queued locally in Local Only mode. Connected tasks add remote lifecycle updates when you choose to sign in.", color = Muted, style = MaterialTheme.typography.bodySmall)
+        if (tasks.isEmpty()) Text("No local or synchronized tasks yet. Write a task above and tap Create.", color = Muted) else LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) { items(tasks, key = { it.id }) { task ->
             var note by remember(task.id) { mutableStateOf("") }; var selectedTool by remember(task.id) { mutableStateOf("web_search") }; val evidenceForTask = taskEvidence.filter { it.taskId == task.id }
             SurfaceCard {
                 Text(task.status.name, color = Lavender, style = MaterialTheme.typography.labelSmall); Text(task.request, modifier = Modifier.padding(top = 6.dp)); if (task.summary.isNotBlank()) Text(task.summary, color = Muted, style = MaterialTheme.typography.bodySmall)
@@ -205,7 +216,8 @@ internal sealed interface LocalStorageAction {
         OutlinedTextField(value = name, onValueChange = { name = it }, modifier = Modifier.fillMaxWidth(), label = { Text("Project name") })
         OutlinedTextField(value = description, onValueChange = { description = it }, modifier = Modifier.fillMaxWidth(), label = { Text("Purpose") })
         Button(onClick = { viewModel.createProject(name, description); name = ""; description = "" }, enabled = name.isNotBlank()) { Text("Create workspace") }
-        if (projects.isEmpty()) Text("No synchronized workspaces yet.", color = Muted) else LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) { items(projects, key = { it.id }) { project -> SurfaceCard { Text(project.name, fontWeight = FontWeight.SemiBold); Text(project.description.ifBlank { "No description provided." }, color = Muted, style = MaterialTheme.typography.bodySmall) } } }
+        Text("Enter a project name to create a local workspace immediately. It stays on this phone unless you later choose a remote workflow.", color = Muted, style = MaterialTheme.typography.bodySmall)
+        if (projects.isEmpty()) Text("No local workspaces yet. Create one above to start organizing work offline.", color = Muted) else LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) { items(projects, key = { it.id }) { project -> SurfaceCard { Text(project.name, fontWeight = FontWeight.SemiBold); Text(project.description.ifBlank { "No description provided." }, color = Muted, style = MaterialTheme.typography.bodySmall) } } }
     }
 }
 
@@ -216,8 +228,9 @@ internal sealed interface LocalStorageAction {
         OutlinedTextField(value = title, onValueChange = { title = it }, modifier = Modifier.fillMaxWidth(), label = { Text("Memory title") })
         OutlinedTextField(value = content, onValueChange = { content = it }, modifier = Modifier.fillMaxWidth(), label = { Text("Memory content") }, minLines = 2)
         Button(onClick = { val existingId = editingId; if (existingId == null) viewModel.createMemory(title, content) else viewModel.updateMemory(existingId, title, content, "PERSONAL"); title = ""; content = ""; editingId = null }, enabled = title.isNotBlank() && content.isNotBlank()) { Text(if (editingId == null) "Save memory" else "Update memory") }
+        Text("Saved memories are available to local prompts on this phone. Enter both fields to save one; remote synchronization is optional.", color = Muted, style = MaterialTheme.typography.bodySmall)
         if (editingId != null) TextButton(onClick = { title = ""; content = ""; editingId = null }) { Text("Cancel edit") }
-        if (memories.isEmpty()) Text("No synchronized memories yet.", color = Muted) else LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) { items(memories, key = { it.id }) { memory -> SurfaceCard { Text(memory.layer, color = Lavender, style = MaterialTheme.typography.labelSmall); Text(memory.title, fontWeight = FontWeight.SemiBold); Text(memory.content, color = Muted, style = MaterialTheme.typography.bodySmall); Row { TextButton(onClick = { title = memory.title; content = memory.content; editingId = memory.id }) { Text("Edit") }; TextButton(onClick = { deleting = memory }) { Text("Remove") } } } } }
+        if (memories.isEmpty()) Text("No saved memories yet. Add one above; it is stored locally in Local Only mode.", color = Muted) else LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) { items(memories, key = { it.id }) { memory -> SurfaceCard { Text(memory.layer, color = Lavender, style = MaterialTheme.typography.labelSmall); Text(memory.title, fontWeight = FontWeight.SemiBold); Text(memory.content, color = Muted, style = MaterialTheme.typography.bodySmall); Row { TextButton(onClick = { title = memory.title; content = memory.content; editingId = memory.id }) { Text("Edit") }; TextButton(onClick = { deleting = memory }) { Text("Remove") } } } } }
     }
     deleting?.let { memory -> ConfirmDialog("Remove memory?", "This removes ‘${memory.title}’ from your Autonova account.", "Remove", { viewModel.deleteMemory(memory.id); deleting = null }) { deleting = null } }
 }

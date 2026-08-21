@@ -13,10 +13,11 @@ import org.junit.Test
 class NavigationTest {
     @get:Rule val compose = createAndroidComposeRule<MainActivity>()
 
-    @Test fun fresh_launch_offers_secure_sign_in_and_a_ready_command_surface() {
-        compose.onNodeWithText("Connect your agent").assertIsDisplayed()
-        compose.onNodeWithText("Connect Autonova").assertIsDisplayed()
-        compose.onNodeWithText("Give Autonova a task or question…").assertIsDisplayed()
+    @Test fun fresh_launch_explains_the_local_work_path_and_a_ready_command_surface() {
+        compose.onNodeWithText("Start working locally").assertIsDisplayed()
+        compose.onNodeWithText("Local projects, memories, tasks, and document storage work now. Private offline answers need a compatible local model.").assertIsDisplayed()
+        compose.onNodeWithText("Give Autonova a task or question").assertIsDisplayed()
+        compose.onNodeWithText("Home").assertIsDisplayed()
     }
 
     @Test fun bottom_navigation_opens_task_surface() {

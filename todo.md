@@ -115,3 +115,8 @@
 - [x] Require distinct test-outcome and benchmark-comparison values for every improvement review record and update learning/audit documentation to reflect the implemented controls.
 - [x] Add a confirmation-gated GitHub workspace-file write operation that uploads only text explicitly selected from the Android scoped workspace and records conflict outcomes.
 - [x] Add a confirmation-gated GitHub workspace-file write operation that uploads only text explicitly selected from the Android scoped workspace and records conflict outcomes.
+- [ ] Repair Android first-run usability: make the active operating mode, model readiness, and the next actionable setup step unmistakable without leaving primary controls blank or disabled without explanation.
+- [ ] Repair Android command-center layout and prompt entry so phone-width navigation labels, device-input actions, and the prompt composer remain visible, tappable, and responsive above system navigation.
+- [ ] Make local project, memory, and task creation operate immediately against the Room-backed local workspace in Local Only mode, with explicit success or failure feedback rather than empty synchronized-state messaging.
+- [ ] Add Android regression coverage and emulator validation for prompt submission, local project/memory/task creation, disabled-state explanations, and narrow-phone navigation layout.
+- [ ] Build, validate, checkpoint, and deliver a corrected Android APK addressing the reported non-functional primary workflows.
