@@ -54,6 +54,22 @@ class DeviceStorage(private val context: Context, private val config: SecureConf
         return asLocal(file)
     }
 
+    /** Creates a user-named text or code artifact inside the selected document tree. */
+    fun createTextArtifact(name: String, content: String): LocalDocument? {
+        val safeName = safeName(name, 120)
+        val extension = safeName.substringAfterLast('.', "").lowercase()
+        val mimeType = when (extension) {
+            "html", "htm" -> "text/html"
+            "json" -> "application/json"
+            "xml" -> "application/xml"
+            "md" -> "text/markdown"
+            else -> "text/plain"
+        }
+        val file = root()?.createFile(mimeType, safeName.ifBlank { "autonova-artifact.txt" }) ?: return null
+        context.contentResolver.openOutputStream(file.uri, "wt")?.bufferedWriter()?.use { it.write(content) } ?: return null
+        return asLocal(file)
+    }
+
     fun createWorkspace(title: String): LocalDocument? {
         val safeName = safeName(title, 80)
         val directory = root()?.createDirectory(safeName) ?: return null

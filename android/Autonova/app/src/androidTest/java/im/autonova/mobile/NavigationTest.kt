@@ -17,6 +17,8 @@ class NavigationTest {
         compose.onNodeWithText("Start working locally").assertIsDisplayed()
         compose.onNodeWithText("Plan my day").assertIsDisplayed()
         compose.onNodeWithText("Create local task").assertIsDisplayed()
+        compose.onNodeWithText("Prepare research").assertIsDisplayed()
+        compose.onNodeWithText("Start coding").assertIsDisplayed()
         compose.onNodeWithText("Give Autonova a task or question").assertIsDisplayed()
         compose.onNodeWithText("Home").assertIsDisplayed()
     }
@@ -54,7 +56,8 @@ class NavigationTest {
         compose.onNodeWithText("More").performClick()
         compose.onNodeWithText("Research").performClick()
         compose.onNodeWithText("Public HTTPS source URLs — one per line").assertIsDisplayed()
-        compose.onNodeWithText("Search web").assertIsDisplayed()
+        compose.onNodeWithText("Open visible search").assertIsDisplayed()
+        compose.onNodeWithText("Save local brief").assertIsDisplayed()
         compose.onNodeWithText("Back").performClick()
         compose.onNodeWithText("Learning & autonomy").performClick()
         compose.onNodeWithText("Propose a memory").assertIsDisplayed()
@@ -64,7 +67,13 @@ class NavigationTest {
     @Test fun more_menu_exposes_github_confirmation_queue() {
         compose.onNodeWithText("More").performClick()
         compose.onNodeWithText("GitHub").performScrollTo().performClick()
-        compose.onNodeWithText("Connect GitHub").assertIsDisplayed()
-        compose.onNodeWithText("Fine-grained GitHub token").assertIsDisplayed()
+        compose.onNodeWithText("GitHub needs optional remote setup").assertIsDisplayed()
+    }
+
+    @Test fun more_menu_exposes_the_scoped_offline_code_lab() {
+        compose.onNodeWithText("More").performClick()
+        compose.onNodeWithText("Code Lab").performClick()
+        compose.onNodeWithText("Scoped local workspace").assertIsDisplayed()
+        compose.onNodeWithText("Choose workspace").assertIsDisplayed()
     }
 }

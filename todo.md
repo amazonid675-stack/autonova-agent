@@ -126,3 +126,10 @@
 - [x] Create a cohesive Autonova Android brand identity, including launcher assets, in-app logo treatment, app name, welcome state, and accessible responsive visual hierarchy.
 - [x] Create a new private GitHub repository under the user’s current connected account and migrate the verified source history without relying on the deleted account.
 - [x] Add exhaustive Android interaction regression coverage, emulator validation, a functional APK build, checkpoint, and final delivery for the rebuilt app.
+- [x] Audit and replace every remaining empty, disconnected, or UI-only Android tab state with a useful local default, a consent-controlled action, or an explicit provider/model setup route.
+- [x] Add an independent-agent command workflow that turns prompts into visible local plans, research briefs, coding work items, and model/provider-routing choices rather than leaving blank fields.
+- [x] Add consent-controlled online research routing with query preparation, source review, visible browser handoff, and synthesis only when a configured provider is available.
+- [x] Add functional local coding-workspace workflows for creating, reviewing, editing, and exporting text/code artifacts within the Android selected-folder scope.
+- [x] Rework image, provider, GitHub, usage, research, tools, learning, storage, and settings surfaces into responsive branded states that clearly distinguish local capability, user consent, and optional online setup.
+- [ ] Add Android regression coverage and emulator validation for the independent command flow, local code workspace, research handoff, provider/model readiness, and no-dead-end tab states.
+- [ ] Build, checkpoint, and deliver a refined Android APK with the completed independent offline-and-online agent experience.

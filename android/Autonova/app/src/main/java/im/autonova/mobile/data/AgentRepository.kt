@@ -61,7 +61,8 @@ class AgentRepository(private val context: Context, private val cache: AgentCach
             appendLocalMessage(ChatMessage("local-model-${System.currentTimeMillis()}", "assistant", response, System.currentTimeMillis()))
             recordLocalActivity("MODEL_ROUTE", "Local response recorded", if (localModel.isAvailable()) "Generated with the user-selected local model, local memory, and local document evidence." else "Generated an on-device quick plan because no compatible local model is installed.")
         }
-        if (text.lowercase().startsWith("build") || text.lowercase().startsWith("create") || text.lowercase().startsWith("research") || text.lowercase().startsWith("plan")) createLocalTask(text)
+        val normalized = text.lowercase()
+        if (normalized.startsWith("build") || normalized.startsWith("create") || normalized.startsWith("research") || normalized.startsWith("plan") || normalized.contains("code") || normalized.contains("website") || normalized.contains("app") || normalized.contains("script")) createLocalTask(text)
         return true
     }
     suspend fun createProject(name: String, description: String): Boolean = runCatching { val client = api(); if (client != null) { client.createProject(name, description); refresh() } else { cache.upsertProjects(listOf(CachedProject("local-project-${System.currentTimeMillis()}", name, description))); recordLocalActivity("LOCAL_PROJECT", "Local workspace created", name) }; true }.getOrDefault(false)

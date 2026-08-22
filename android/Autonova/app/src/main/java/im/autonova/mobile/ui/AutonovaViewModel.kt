@@ -77,16 +77,16 @@ class AutonovaViewModel(application: Application) : AndroidViewModel(application
     fun clearConnection() { config.clearSession(); _configured.value = false; _connectionState.value = ConnectionState.READY_TO_CONNECT; _feedback.value = MobileFeedback("Local Autonova session cleared.", FeedbackTone.INFO) }
     fun createProject(name: String, description: String) = localFirstAction("create the workspace") { repository.createProject(name, description) }
     fun createTask(request: String) = localFirstAction("create the task") { repository.createTask(request) }
-    fun changeTaskStatus(id: String, status: String) = connectedAction("update the task") { repository.changeTaskStatus(id, status) }
+    fun changeTaskStatus(id: String, status: String) = localFirstAction("update the task") { repository.changeTaskStatus(id, status) }
     fun createMemory(title: String, content: String, layer: String = "PERSONAL") = localFirstAction("save the memory") { repository.createMemory(title, content, layer) }
     fun updateMemory(id: String, title: String, content: String, layer: String) = localFirstAction("update the memory") { repository.updateMemory(id, title, content, layer) }
     fun deleteMemory(id: String) = localFirstAction("remove the memory") { repository.deleteMemory(id) }
-    fun setToolPolicy(key: String, policy: String) = connectedAction("update the tool policy") { repository.setToolPolicy(key, policy) }
+    fun setToolPolicy(key: String, policy: String) = localFirstAction("update the tool policy") { repository.setToolPolicy(key, policy) }
     fun uploadLocalFile(document: LocalDocument, bytes: ByteArray) = connectedAction("upload ${document.name}") { repository.uploadFile(document, bytes) }
     fun indexLocalDocument(document: LocalDocument, bytes: ByteArray) = localFirstAction("index ${document.name} locally") { repository.indexLocalDocument(document, bytes) }
     fun clearLocalKnowledgeIndex() = localFirstAction("clear the local document index") { repository.clearLocalKnowledgeIndex() }
     fun clearLocalActivityCache() = localFirstAction("clear local activity summaries") { repository.clearLocalActivityCache() }
-    fun uploadDeviceContext(name: String, mimeType: String, bytes: ByteArray) = connectedAction("upload $name") { repository.uploadDeviceContext(name, mimeType, bytes) }
+    fun uploadDeviceContext(name: String, mimeType: String, bytes: ByteArray) = localFirstAction("save $name as private device context") { repository.uploadDeviceContext(name, mimeType, bytes) }
     fun importSharedContent(content: SharedAgentContent) = viewModelScope.launch {
         content.text?.let { submit("Shared from Android:\n$it") }
         content.uri?.let { uri ->
@@ -108,20 +108,22 @@ class AutonovaViewModel(application: Application) : AndroidViewModel(application
     fun setNotificationsEnabled(enabled: Boolean) { config.setNotificationsEnabled(enabled); _feedback.value = MobileFeedback(if (enabled) "Task completion notifications enabled." else "Task completion notifications disabled.", FeedbackTone.SUCCESS) }
     fun notificationsEnabled(): Boolean = config.notificationsEnabled()
     fun saveProvider(name: String, providerType: String, baseUrl: String, model: String, apiKey: String, costMode: String) = connectedAction("save the provider") { repository.saveProvider(name, providerType, baseUrl, model, apiKey, costMode) }
-    fun refreshUsage() = connectedAction("refresh usage") { repository.refreshUsage() }
+    fun refreshUsage() = localFirstAction("refresh usage") { repository.refreshUsage() }
     fun generateImage(prompt: String) = connectedAction("generate the image") { repository.generateImage(prompt) }
+    fun saveImageBrief(prompt: String) = localFirstAction("save the image brief") { repository.createTask("Image brief: $prompt") }
     fun inspectGitHub(repositoryName: String) = connectedAction("inspect the repository") { repository.inspectGitHub(repositoryName) }
-    fun runResearch(query: String, sources: List<String>) = connectedAction("research the selected public sources with gpt-5-mini") { repository.research(query, sources) }
+    fun prepareResearch(query: String) = localFirstAction("save the local research brief") { repository.research(query, emptyList()) }
+    fun runResearch(query: String, sources: List<String>) = localFirstAction(if (config.isConfigured()) "research the selected public sources" else "save the selected-source research brief") { repository.research(query, sources) }
     fun createLearningCandidate(title: String, content: String, layer: String = "PERSONAL") = localFirstAction("save the learning candidate for review") { repository.createLearningCandidate(title, content, layer) }
     fun reviewLearningCandidate(id: String, status: String, title: String? = null, content: String? = null, layer: String? = null) = localFirstAction(if (status == "APPROVED") "save the reviewed learning" else "dismiss the learning candidate") { repository.reviewLearningCandidate(id, status, title, content, layer) }
     fun createImprovement(scope: String, title: String, proposedChange: String, evidence: String, testOutcome: String, benchmarkSummary: String, versionLabel: String) = connectedAction("save the improvement record for review") { repository.createImprovement(scope, title, proposedChange, evidence, testOutcome, benchmarkSummary, versionLabel) }
     fun reviewImprovement(id: String, status: String, note: String) = connectedAction(if (status == "APPROVED") "approve the improvement" else if (status == "ROLLED_BACK") "roll back the improvement" else "reject the improvement") { repository.reviewImprovement(id, status, note) }
-    fun observeTask(id: String, summary: String, evidence: String) = connectedAction("record the task observation") { repository.observeTask(id, summary, evidence) }
-    fun selectTaskTool(id: String, toolKey: String, rationale: String) = connectedAction("select the task tool") { repository.selectTaskTool(id, toolKey, rationale) }
-    fun approveTaskTool(id: String, toolKey: String, approved: Boolean, note: String) = connectedAction(if (approved) "approve the task tool" else "decline the task tool") { repository.approveTaskTool(id, toolKey, approved, note) }
-    fun repairTask(id: String, diagnosis: String) = connectedAction("start the task repair") { repository.repairTask(id, diagnosis) }
-    fun escalateTask(id: String, level: String, summary: String) = connectedAction("escalate the task") { repository.escalateTask(id, level, summary) }
-    fun verifyTask(id: String, passed: Boolean, evidence: String) = connectedAction("record task verification") { repository.verifyTask(id, passed, evidence) }
+    fun observeTask(id: String, summary: String, evidence: String) = localFirstAction("record the task observation") { repository.observeTask(id, summary, evidence) }
+    fun selectTaskTool(id: String, toolKey: String, rationale: String) = localFirstAction("select the task tool") { repository.selectTaskTool(id, toolKey, rationale) }
+    fun approveTaskTool(id: String, toolKey: String, approved: Boolean, note: String) = localFirstAction(if (approved) "approve the task tool" else "decline the task tool") { repository.approveTaskTool(id, toolKey, approved, note) }
+    fun repairTask(id: String, diagnosis: String) = localFirstAction("start the task repair") { repository.repairTask(id, diagnosis) }
+    fun escalateTask(id: String, level: String, summary: String) = localFirstAction("escalate the task") { repository.escalateTask(id, level, summary) }
+    fun verifyTask(id: String, passed: Boolean, evidence: String) = localFirstAction("record task verification") { repository.verifyTask(id, passed, evidence) }
     fun createCapabilityGrant(capability: String, scope: String, rationale: String) = localFirstAction("propose the capability grant") { repository.createCapabilityGrant(capability, scope, rationale) }
     fun updateCapabilityGrant(id: String, status: String) = localFirstAction("update the capability grant") { repository.updateCapabilityGrant(id, status) }
     fun connectGitHub(token: String, scopes: String) = connectedAction("connect GitHub") { repository.connectGitHub(token, scopes) }

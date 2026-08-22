@@ -32,6 +32,9 @@ class FunctionalLocalControlsInstrumentedTest {
         val research = withTimeout(3_000) { cache.observeResearch().first { items -> items.any { it.query == "Local research" } } }.first { it.query == "Local research" }
         assertEquals("LOCAL_BROWSER_HANDOFF", research.status)
 
+        assertTrue(repository.research("Offline brief", emptyList()))
+        assertTrue(withTimeout(3_000) { cache.observeResearch().first { items -> items.any { it.query == "Offline brief" && it.status == "LOCAL_BROWSER_HANDOFF" } } }.any { it.query == "Offline brief" })
+
         assertTrue(repository.createLearningCandidate("Local preference", "Use short plans", "PERSONAL"))
         val candidate = withTimeout(3_000) { cache.observeLearningCandidates().first { items -> items.any { it.title == "Local preference" } } }.first { it.title == "Local preference" }
         assertTrue(repository.reviewLearningCandidate(candidate.id, "APPROVED"))
@@ -47,6 +50,9 @@ class FunctionalLocalControlsInstrumentedTest {
 
         assertTrue(repository.uploadDeviceContext("test-context.txt", "text/plain", "private local context".toByteArray()))
         assertTrue(repository.files.value.any { it.name.endsWith("test-context.txt") })
+
+        assertTrue(repository.submit("Build a local website plan"))
+        assertTrue(withTimeout(3_000) { cache.observeTasks().first { items -> items.any { it.request == "Build a local website plan" } } }.any { it.request == "Build a local website plan" })
         database.close()
     }
 }

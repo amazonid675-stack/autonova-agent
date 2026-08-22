@@ -9,6 +9,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.browser.customtabs.CustomTabsIntent
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -153,6 +154,7 @@ internal sealed interface LocalStorageAction {
     val screenshotConsent = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result -> screenshotCapture.capture(result.resultCode, result.data) { bytes -> bytes.onSuccess { viewModel.uploadDeviceContext("screenshot-${System.currentTimeMillis()}.jpg", "image/jpeg", it) }.onFailure { viewModel.showError(it.message ?: "Screenshot capture failed.") } } }
     Column(modifier.fillMaxSize().imePadding().padding(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         PageHeader("Personal agent workspace", "Command center", if (configured) "Your optional remote agent is connected. Responses and task updates appear here." else "Local projects, memories, tasks, and document storage work now. Private offline answers need a compatible local model.")
+        AgentReadinessCard(operatingMode, configured, viewModel.localModelReady())
         if (!configured) SurfaceCard {
             Text("Start working locally", color = Lavender, style = MaterialTheme.typography.labelSmall)
             Text("You can create a project, memory, or task without signing in. Every prompt now returns a local working response; import a compatible `.task` model from More → Device capabilities for generated offline answers.", color = Muted, style = MaterialTheme.typography.bodySmall)
@@ -162,7 +164,7 @@ internal sealed interface LocalStorageAction {
                 Button(onClick = { viewModel.beginMobileSignIn()?.let { CustomTabsIntent.Builder().build().launchUrl(context, Uri.parse(it)) } }) { Text(if (connectionState == ConnectionState.CONNECTING) "Continue sign-in" else "Connect optional agent") }
             }
         } else AssistChip(onClick = { viewModel.refresh() }, label = { Text("Optional agent connected") })
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) { AssistChip(onClick = { viewModel.submit("Plan my day") }, label = { Text("Plan my day") }); AssistChip(onClick = { viewModel.submit("Create a local task to organize my work") }, label = { Text("Create local task") }); AssistChip(onClick = { viewModel.submit("Show my saved local context") }, label = { Text("Use local context") }) }
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) { AssistChip(onClick = { viewModel.submit("Plan my day") }, label = { Text("Plan my day") }); AssistChip(onClick = { viewModel.submit("Create a local task to organize my work") }, label = { Text("Create local task") }); AssistChip(onClick = { viewModel.prepareResearch("Research a topic with selected public sources") }, label = { Text("Prepare research") }); AssistChip(onClick = { viewModel.submit("Create a coding work item") }, label = { Text("Start coding") }); AssistChip(onClick = { viewModel.submit("Show my saved local context") }, label = { Text("Use local context") }) }
         SurfaceCard {
             Text("Device inputs", color = Lavender, style = MaterialTheme.typography.labelSmall)
             Text("Voice, camera, screenshots, files, shared items, URLs, and clipboard content become agent context only after you choose an action.", color = Muted, style = MaterialTheme.typography.bodySmall)
@@ -186,6 +188,18 @@ internal sealed interface LocalStorageAction {
         if (messages.lastOrNull()?.role == "assistant") TextButton(onClick = { if (!voice.speak(messages.last().content)) viewModel.showError("Voice output is unavailable on this device.") }) { Text("Read latest response aloud") }
     }
     confirmClipboard?.let { text -> ConfirmDialog("Import clipboard text?", "This sends the selected clipboard text to your agent workspace.", "Import", { viewModel.recordDeviceAction("clipboard.import", "User confirmed importing clipboard text into the agent workspace."); viewModel.submit("Clipboard context from Android:\n$text"); confirmClipboard = null }) { confirmClipboard = null } }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable private fun AgentReadinessCard(mode: OperatingMode, connected: Boolean, localModelReady: Boolean) = SurfaceCard {
+    Text("AGENT STATUS", color = Lavender, style = MaterialTheme.typography.labelSmall)
+    Text(if (connected) "Connected and ready for optional online work" else "Independent local workspace ready", fontWeight = FontWeight.SemiBold)
+    Text(if (connected) "Prompts can use your configured agent. Local memory and scoped storage remain available on this phone." else "Prompts, plans, tasks, memory, research briefs, device context, and scoped Code Lab work now. A local model adds generated offline answers.", color = Muted, style = MaterialTheme.typography.bodySmall)
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        AssistChip(onClick = {}, label = { Text(mode.name.lowercase().replace('_', ' ')) })
+        AssistChip(onClick = {}, label = { Text(if (localModelReady) "local model ready" else "local model optional") })
+        AssistChip(onClick = {}, label = { Text(if (connected) "online connected" else "online by consent") })
+    }
 }
 
 @Composable private fun TasksScreen(viewModel: AutonovaViewModel, modifier: Modifier) {
@@ -239,13 +253,14 @@ internal sealed interface LocalStorageAction {
 }
 
 @Composable private fun ColumnScope.ResearchScreen(viewModel: AutonovaViewModel) {
-    val research by viewModel.research.collectAsState(); val context = LocalContext.current; var query by remember { mutableStateOf("") }; var sources by remember { mutableStateOf("") }; var confirmSearch by remember { mutableStateOf(false) }
+    val research by viewModel.research.collectAsState(); val configured by viewModel.configured.collectAsState(); val context = LocalContext.current; var query by remember { mutableStateOf("") }; var sources by remember { mutableStateOf("") }; var confirmSearch by remember { mutableStateOf(false) }
     Column(Modifier.fillMaxWidth().weight(1f).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("Research", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-        Text("Search visibly in your browser, then paste or share one to five public HTTPS source URLs. Autonova reads only the sources you select and synthesizes them with gpt-5-mini, recording citations and usage.", color = Muted, style = MaterialTheme.typography.bodySmall)
+        Text(if (configured) "Start with a visible browser search, then paste or share one to five public HTTPS sources. Autonova reads only sources you select and can synthesize them through your connected provider." else "Start with a visible browser search, then save a private research brief and selected public HTTPS sources. A provider is optional and only needed for online synthesis.", color = Muted, style = MaterialTheme.typography.bodySmall)
         OutlinedTextField(value = query, onValueChange = { query = it }, modifier = Modifier.fillMaxWidth(), label = { Text("Research question") }, minLines = 2)
-        Row { Button(onClick = { confirmSearch = query.trim().length >= 3 }, enabled = query.trim().length >= 3) { Text("Search web") }; Spacer(Modifier.width(8.dp)); Button(onClick = { viewModel.runResearch(query, sources.lineSequence().map { it.trim() }.filter { it.isNotBlank() }.toList()) }, enabled = query.trim().length >= 3 && sources.lineSequence().any { it.trim().startsWith("https://") }) { Text("Research selected sources") } }
+        Row { Button(onClick = { confirmSearch = query.trim().length >= 3 }, enabled = query.trim().length >= 3) { Text("Open visible search") }; Spacer(Modifier.width(8.dp)); Button(onClick = { viewModel.prepareResearch(query) }, enabled = query.trim().length >= 3) { Text("Save local brief") } }
         OutlinedTextField(value = sources, onValueChange = { sources = it }, modifier = Modifier.fillMaxWidth(), label = { Text("Public HTTPS source URLs — one per line") }, minLines = 3)
+        Button(onClick = { viewModel.runResearch(query, sources.lineSequence().map { it.trim() }.filter { it.isNotBlank() }.toList()) }, enabled = query.trim().length >= 3 && sources.lineSequence().any { it.trim().startsWith("https://") }) { Text(if (configured) "Synthesize selected sources" else "Save selected-source brief") }
         if (research.isEmpty()) Text("No completed research sessions yet.", color = Muted) else research.forEach { session -> SurfaceCard { Text(session.status, color = Lavender, style = MaterialTheme.typography.labelSmall); Text(session.query, fontWeight = FontWeight.SemiBold); if (session.summary.isNotBlank()) Text(session.summary, color = Muted, style = MaterialTheme.typography.bodySmall) } }
     }
     if (confirmSearch) ConfirmDialog("Open web search?", "Open your visible browser to search for: ${query.trim()}? Share or paste only the public sources you want Autonova to read.", "Open search", { CustomTabsIntent.Builder().build().launchUrl(context, Uri.parse("https://www.google.com/search?q=${Uri.encode(query.trim())}")); confirmSearch = false }, { confirmSearch = false })
@@ -267,11 +282,11 @@ internal sealed interface LocalStorageAction {
 
 @Composable private fun MoreScreen(viewModel: AutonovaViewModel, modifier: Modifier) {
     var selected by remember { mutableStateOf<String?>(null) }
-    val options = listOf("Files & Storage" to "Secure cloud files and a folder you choose on this device.", "Research" to "Search visibly, select public sources, and receive source-cited research.", "Learning & autonomy" to "Review proposed memories and narrow capability grants.", "Device capabilities" to "Voice, camera, screenshots, local AI, notifications, sharing, and background review.", "Tools" to "Permissioned capabilities with Ask, Allow, and Deny.", "Image Studio" to "Generate images through the protected Autonova image service.", "GitHub" to "Inspect repositories and prepare confirmation-gated GitHub operations.", "Usage" to "Review token, tool, and cost totals for your account.", "Settings" to "Browser sign-in, encrypted local credentials, and provider configuration.", "Activity" to "Visible agent action summaries and device events.")
+    val options = listOf("Files & Storage" to "Works offline · selected-folder notes, search, edit, export, and archive.", "Code Lab" to "Works offline · create and edit scoped text and code artifacts.", "Research" to "Needs consent · visible web search, selected sources, and optional synthesis.", "Learning & autonomy" to "Works offline · review memories and narrow capability grants.", "Device capabilities" to "Needs consent · local AI, voice, camera, screenshots, sharing, and background review.", "Tools" to "Works offline · choose Ask, Allow, or Deny for each tool.", "Image Studio" to "Works offline for briefs · an online provider generates images.", "GitHub" to "Needs optional provider · inspect and confirm GitHub operations.", "Usage" to "Works offline · review Local Only or provider usage.", "Settings" to "Control local, internet, and optional remote-agent modes.", "Activity" to "Works offline · visible action summaries and device events.")
     Column(modifier.fillMaxSize().padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         PageHeader("Control plane", selected ?: "More", if (selected == null) "Every action remains visible and under your control." else null)
         if (selected == null) Column(Modifier.fillMaxWidth().weight(1f).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) { options.forEach { (title, detail) -> SurfaceCard(Modifier.clickable { selected = title }) { Text(title, fontWeight = FontWeight.SemiBold); Text(detail, color = Muted, style = MaterialTheme.typography.bodySmall) } } } else {
-            when (selected) { "Files & Storage" -> FilesAndStorageScreen(viewModel); "Research" -> ResearchScreen(viewModel); "Learning & autonomy" -> LearningScreen(viewModel); "Device capabilities" -> DeviceCapabilitiesScreen(viewModel); "Tools" -> ToolsScreen(viewModel); "Image Studio" -> ImageStudioScreen(viewModel); "GitHub" -> GitHubScreen(viewModel); "Usage" -> UsageScreen(viewModel); "Settings" -> SettingsScreen(viewModel); "Activity" -> ActivityScreen(viewModel) }
+            when (selected) { "Files & Storage" -> FilesAndStorageScreen(viewModel); "Code Lab" -> CodeLabScreen(viewModel); "Research" -> ResearchScreen(viewModel); "Learning & autonomy" -> LearningScreen(viewModel); "Device capabilities" -> DeviceCapabilitiesScreen(viewModel); "Tools" -> ToolsScreen(viewModel); "Image Studio" -> ImageStudioScreen(viewModel); "GitHub" -> GitHubScreen(viewModel); "Usage" -> UsageScreen(viewModel); "Settings" -> SettingsScreen(viewModel); "Activity" -> ActivityScreen(viewModel) }
             TextButton(onClick = { selected = null }) { Text("Back") }
         }
     }
@@ -286,7 +301,7 @@ internal sealed interface LocalStorageAction {
         Text("Autonova asks before it uses sensitive phone features. It never performs background browser, clipboard, file, or external actions without a visible user request.", color = Muted, style = MaterialTheme.typography.bodySmall)
         SurfaceCard { Text("Task completion notifications", fontWeight = FontWeight.SemiBold); Text("Receive a local alert when a synchronized agent task completes or fails.", color = Muted, style = MaterialTheme.typography.bodySmall); Button(onClick = { notificationsPermission.launch(Manifest.permission.POST_NOTIFICATIONS) }) { Text(if (notifications.value) "Notifications enabled" else "Enable notifications") } }
         SurfaceCard { Text("On-device local model", fontWeight = FontWeight.SemiBold); Text(viewModel.localModelStatus(), color = Muted, style = MaterialTheme.typography.bodySmall); Text("Private model storage: ${viewModel.localModelStorageBytes() / (1024 * 1024)} MB. Models stay in Android private storage and are not uploaded to Autonova.", color = Muted, style = MaterialTheme.typography.bodySmall); Row { Button(onClick = { localModelPicker.launch(arrayOf("application/octet-stream")) }) { Text("Import local model") }; Spacer(Modifier.width(8.dp)); TextButton(onClick = { viewModel.removeLocalModel() }) { Text("Remove model") } }; OutlinedTextField(value = localPrompt, onValueChange = { localPrompt = it }, modifier = Modifier.fillMaxWidth(), label = { Text("Private local prompt") }); Button(onClick = { viewModel.runLocalModel(localPrompt) }, enabled = localPrompt.isNotBlank()) { Text("Run locally") } }
-        SurfaceCard { Text("Model capability routing", fontWeight = FontWeight.SemiBold); Text("Each modality is labelled by its actual route. A listed capability does not grant access or silently enable a remote provider.", color = Muted, style = MaterialTheme.typography.bodySmall); if (modelCapabilities.isEmpty()) Text("Connect the optional remote agent to retrieve its capability matrix. Local model, scoped files, and Android services remain available under their own device controls.", color = Muted, style = MaterialTheme.typography.bodySmall) else modelCapabilities.forEach { capability -> Text("${capability.modality} · ${capability.route} · ${capability.availability}", color = Lavender, style = MaterialTheme.typography.labelSmall); Text(capability.note, color = Muted, style = MaterialTheme.typography.bodySmall) } }
+        SurfaceCard { Text("Model capability routing", fontWeight = FontWeight.SemiBold); Text("Each modality is labelled by its actual route. A listed capability does not grant access or silently enable a remote provider.", color = Muted, style = MaterialTheme.typography.bodySmall); if (modelCapabilities.isEmpty()) { Text("TEXT · LOCAL · ${if (viewModel.localModelReady()) "READY" else "MODEL REQUIRED"}", color = Lavender, style = MaterialTheme.typography.labelSmall); Text("Local memory, lexical document retrieval, scoped files, and Android device inputs work now. Import a compatible `.task` file to generate private on-device answers. Connect an optional agent only for cloud modalities.", color = Muted, style = MaterialTheme.typography.bodySmall) } else modelCapabilities.forEach { capability -> Text("${capability.modality} · ${capability.route} · ${capability.availability}", color = Lavender, style = MaterialTheme.typography.labelSmall); Text(capability.note, color = Muted, style = MaterialTheme.typography.bodySmall) } }
         SurfaceCard { Text("Browser handoff", fontWeight = FontWeight.SemiBold); Text("Open a site visibly in your preferred browser. Autonova does not silently browse, log in, post, or purchase on your behalf.", color = Muted, style = MaterialTheme.typography.bodySmall); OutlinedTextField(value = browserUrl, onValueChange = { browserUrl = it }, modifier = Modifier.fillMaxWidth(), label = { Text("https://example.com") }, singleLine = true); Button(onClick = { browserConfirmation = browserUrl.startsWith("https://") }) { Text("Open website") } }
         SurfaceCard { Text("Sharing and clipboard", fontWeight = FontWeight.SemiBold); Text("Use Android Share from another app to open Autonova with text, images, PDFs, or files. Clipboard import is available from Command and always asks for confirmation.", color = Muted, style = MaterialTheme.typography.bodySmall) }
         SurfaceCard { Text("Background learning review", fontWeight = FontWeight.SemiBold); Text("When enabled, Android may refresh your protected workspace and prepare reviewable preference candidates from your own Autonova messages. It never trains model weights, browses websites, or posts to services in the background. Outcomes appear in Activity and, if enabled, as a notification.", color = Muted, style = MaterialTheme.typography.bodySmall); Row { AssistChip(onClick = { backgroundEnabled = !backgroundEnabled }, label = { Text(if (backgroundEnabled) "✓ Background sync" else "Background sync") }); AssistChip(onClick = { requiresCharging = !requiresCharging }, label = { Text(if (requiresCharging) "✓ Charging only" else "Charging only") }); AssistChip(onClick = { requiresUnmetered = !requiresUnmetered }, label = { Text(if (requiresUnmetered) "✓ Unmetered only" else "Unmetered only") }); AssistChip(onClick = { learningReview = !learningReview }, label = { Text(if (learningReview) "✓ Propose learning" else "Propose learning") }) }; OutlinedTextField(value = interval, onValueChange = { interval = it.filter(Char::isDigit) }, modifier = Modifier.fillMaxWidth(), label = { Text("Minimum minutes between checks (15 or more)") }, singleLine = true); Button(onClick = { viewModel.setBackgroundProfile(backgroundEnabled, requiresCharging, requiresUnmetered, interval.toLongOrNull()?.coerceAtLeast(15L) ?: 15L, learningReview) }) { Text(if (backgroundEnabled) "Save background profile" else "Pause background review") } }
@@ -338,6 +353,62 @@ private fun uploadCameraBitmap(bitmap: Bitmap, viewModel: AutonovaViewModel) { v
     Text("Export creates a copy in another folder you select; Android document providers do not guarantee atomic cross-provider moves, so Autonova does not remove the original automatically.", color = Muted, style = MaterialTheme.typography.bodySmall)
 }
 
+@OptIn(ExperimentalLayoutApi::class)
+@Composable private fun CodeLabScreen(viewModel: AutonovaViewModel) {
+    val context = LocalContext.current
+    val storage = remember(context) { DeviceStorage(context, SecureConfig(context)) }
+    var artifacts by remember { mutableStateOf(storage.searchFiles("").filter(storage::isEditable)) }
+    var artifactName by remember { mutableStateOf("main.kt") }
+    var artifactContent by remember { mutableStateOf("fun main() {\n    println(\"Hello from Autonova\")\n}\n") }
+    var pendingCreate by remember { mutableStateOf(false) }
+    var editing by remember { mutableStateOf<LocalDocument?>(null) }
+    var editingText by remember { mutableStateOf("") }
+    val folderPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+        if (uri != null) runCatching { storage.selectTree(uri) }
+            .onSuccess { artifacts = storage.searchFiles("").filter(storage::isEditable); viewModel.recordDeviceAction("code.workspace", "User selected a scoped local code workspace.") }
+            .onFailure { viewModel.showError("Autonova could not use that folder as a local code workspace.") }
+    }
+    Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text("Code Lab", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+        Text("Create, read, edit, search, export, and archive source artifacts in a folder you choose. Code stays on your phone unless you later choose a confirmed GitHub or provider workflow. Android does not provide unrestricted shell execution.", color = Muted, style = MaterialTheme.typography.bodySmall)
+        SurfaceCard {
+            Text("Scoped local workspace", fontWeight = FontWeight.SemiBold)
+            Text(if (storage.hasFolder()) "A folder is selected. Code Lab can work only inside that scope." else "Choose a folder to create and edit local code artifacts.", color = Muted, style = MaterialTheme.typography.bodySmall)
+            Row { Button(onClick = { folderPicker.launch(null) }) { Text(if (storage.hasFolder()) "Change workspace" else "Choose workspace") }; if (storage.hasFolder()) { Spacer(Modifier.width(8.dp)); TextButton(onClick = { artifacts = storage.searchFiles("").filter(storage::isEditable) }) { Text("Refresh") } } }
+        }
+        if (storage.hasFolder()) {
+            SurfaceCard {
+                Text("Create a code artifact", fontWeight = FontWeight.SemiBold)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    AssistChip(onClick = { artifactName = "main.kt"; artifactContent = "fun main() {\n    println(\"Hello from Autonova\")\n}\n" }, label = { Text("Kotlin") })
+                    AssistChip(onClick = { artifactName = "index.html"; artifactContent = "<!doctype html>\n<html><body><h1>Autonova project</h1></body></html>\n" }, label = { Text("HTML") })
+                    AssistChip(onClick = { artifactName = "plan.md"; artifactContent = "# Project plan\n\n## Goal\n\n## Next actions\n1. \n2. \n3. \n" }, label = { Text("Plan") })
+                }
+                OutlinedTextField(value = artifactName, onValueChange = { artifactName = it }, modifier = Modifier.fillMaxWidth(), label = { Text("Filename, for example main.kt") })
+                OutlinedTextField(value = artifactContent, onValueChange = { artifactContent = it }, modifier = Modifier.fillMaxWidth(), label = { Text("Local source or text") }, minLines = 8)
+                Button(onClick = { pendingCreate = true }, enabled = artifactName.isNotBlank() && artifactContent.isNotBlank()) { Text("Review local create") }
+            }
+            Text("Editable artifacts", color = Lavender, style = MaterialTheme.typography.labelSmall)
+            if (artifacts.isEmpty()) Text("No supported text or code artifact is in this workspace yet. Create one above.", color = Muted, style = MaterialTheme.typography.bodySmall)
+            else artifacts.take(30).forEach { artifact -> SurfaceCard {
+                Text(artifact.name, fontWeight = FontWeight.SemiBold)
+                Text("${artifact.mimeType} · ${artifact.sizeBytes} bytes · local only", color = Muted, style = MaterialTheme.typography.bodySmall)
+                Row {
+                    TextButton(onClick = { val text = storage.readText(artifact); if (text == null) viewModel.showError("This artifact cannot be opened in Code Lab. Text files up to 1 MB are supported.") else { editing = artifact; editingText = text } }) { Text("Edit") }
+                    TextButton(onClick = { storage.readBytes(artifact)?.let { viewModel.indexLocalDocument(artifact, it) } }) { Text("Use as context") }
+                }
+            } }
+        }
+    }
+    if (pendingCreate) ConfirmDialog("Create local code artifact?", "Create ‘$artifactName’ in your selected workspace? This stays on-device and is not uploaded.", "Create", {
+        val created = storage.createTextArtifact(artifactName, artifactContent)
+        if (created == null) viewModel.showError("Autonova could not create this artifact. Check folder write access.")
+        else { artifacts = storage.searchFiles("").filter(storage::isEditable); viewModel.recordDeviceAction("code.artifact", "User created local code artifact ${created.name}.") }
+        pendingCreate = false
+    }, { pendingCreate = false })
+    editing?.let { document -> AlertDialog(onDismissRequest = { editing = null }, title = { Text("Edit ${document.name}") }, text = { OutlinedTextField(value = editingText, onValueChange = { editingText = it }, modifier = Modifier.fillMaxWidth(), label = { Text("Local code") }, minLines = 10) }, confirmButton = { Button(onClick = { if (storage.writeText(document, editingText)) { viewModel.recordDeviceAction("code.artifact", "User saved local edits to ${document.name}."); artifacts = storage.searchFiles("").filter(storage::isEditable) } else viewModel.showError("Autonova could not save this artifact. Check folder write access."); editing = null }) { Text("Save locally") } }, dismissButton = { TextButton(onClick = { editing = null }) { Text("Cancel") } }) }
+}
+
 @Composable internal fun LocalStorageActionConfirmation(action: LocalStorageAction?, noteTitle: String, onCreate: () -> Unit, onCreateWorkspace: (String) -> Unit, onOpen: (LocalDocument) -> Unit, onShare: (LocalDocument) -> Unit, onDelete: (LocalDocument) -> Unit, onEdit: (LocalDocument) -> Unit, onSaveEdit: (LocalDocument, String) -> Unit, onExport: (LocalDocument) -> Unit, onArchive: (LocalDocument) -> Unit, onClearIndex: () -> Unit, onClearActivity: () -> Unit, onDismiss: () -> Unit) {
     when (action) {
         LocalStorageAction.CreateNote -> ConfirmDialog("Create local note?", "Create ‘${noteTitle.ifBlank { "Autonova note" }}.txt’ in the selected folder?", "Create", onCreate, onDismiss)
@@ -363,8 +434,8 @@ private fun uploadCameraBitmap(bitmap: Bitmap, viewModel: AutonovaViewModel) { v
 @Composable private fun RemoteFileRow(file: FileItem) = SurfaceCard { Text(file.name, fontWeight = FontWeight.SemiBold); Text("${file.mimeType} · ${file.sizeBytes} bytes", color = Muted, style = MaterialTheme.typography.bodySmall) }
 
 @Composable private fun ToolsScreen(viewModel: AutonovaViewModel) {
-    val tools by viewModel.tools.collectAsState(); Text("Tools", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold); Text("Choose the default approval policy for each capability. Ask is the safest default.", color = Muted, style = MaterialTheme.typography.bodySmall)
-    if (tools.isEmpty()) Text("Tool policies appear after your protected session synchronizes.", color = Muted) else tools.forEach { tool -> ToolRow(tool, viewModel) }
+    val tools by viewModel.tools.collectAsState(); Text("Tools", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold); Text("Choose the default approval policy for each capability. These local controls apply immediately; any consequential action still asks at the moment it is used.", color = Muted, style = MaterialTheme.typography.bodySmall)
+    if (tools.isEmpty()) SurfaceCard { Text("Local tool registry is preparing", fontWeight = FontWeight.SemiBold); Text("Restart the app if policies do not appear. Autonova’s local workspace, browser handoff, and device-context tools default to Ask.", color = Muted, style = MaterialTheme.typography.bodySmall) } else tools.forEach { tool -> ToolRow(tool, viewModel) }
 }
 
 @Composable private fun ToolRow(tool: ToolItem, viewModel: AutonovaViewModel) {
@@ -376,7 +447,8 @@ private fun uploadCameraBitmap(bitmap: Bitmap, viewModel: AutonovaViewModel) { v
     val imageUrl by viewModel.generatedImageUrl.collectAsState(); val configured by viewModel.configured.collectAsState(); var prompt by remember { mutableStateOf("") }; val context = LocalContext.current
     Text("Image studio", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold); Text(if (configured) "Describe an image to generate through your connected protected image service." else "Image generation requires your optional remote agent. Local mode can save prompts and private device context but does not pretend to generate images without a configured provider.", color = Muted, style = MaterialTheme.typography.bodySmall)
     OutlinedTextField(value = prompt, onValueChange = { prompt = it }, modifier = Modifier.fillMaxWidth(), label = { Text("Image prompt") }, minLines = 3)
-    Button(onClick = { if (configured) viewModel.generateImage(prompt) else viewModel.showError("Image generation needs a connected optional agent and provider. Configure it in More → Settings.") }, enabled = prompt.trim().length >= 3) { Text(if (configured) "Generate image" else "Show setup requirement") }
+    Row { Button(onClick = { viewModel.saveImageBrief(prompt) }, enabled = prompt.trim().length >= 3) { Text("Save image brief") }; Spacer(Modifier.width(8.dp)); if (configured) Button(onClick = { viewModel.generateImage(prompt) }, enabled = prompt.trim().length >= 3) { Text("Generate image") } }
+    if (!configured) Text("Your brief is saved locally as a task. To generate, connect a provider in Settings when you are ready to send the prompt online.", color = Muted, style = MaterialTheme.typography.bodySmall)
     imageUrl?.let { url -> SurfaceCard { Text("Generated image ready", color = Lavender, style = MaterialTheme.typography.labelSmall); Text(url, color = Muted, style = MaterialTheme.typography.bodySmall); TextButton(onClick = { runCatching { context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url))) } }) { Text("Open image") } } }
 }
 
@@ -392,8 +464,8 @@ private fun uploadCameraBitmap(bitmap: Bitmap, viewModel: AutonovaViewModel) { v
 }
 
 @Composable private fun UsageScreen(viewModel: AutonovaViewModel) {
-    val usage by viewModel.usage.collectAsState(); Text("Usage", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold); Text("Token and tool activity is calculated server-side from your protected account records.", color = Muted, style = MaterialTheme.typography.bodySmall); Button(onClick = { viewModel.refreshUsage() }) { Text("Refresh usage") }
-    usage?.let { summary -> SurfaceCard { Text("${summary.inputTokens + summary.outputTokens} total tokens", fontWeight = FontWeight.Bold); Text("${summary.inputTokens} input · ${summary.outputTokens} output · ${summary.toolCalls} tool calls", color = Muted, style = MaterialTheme.typography.bodySmall); Text("Estimated cost: ${summary.estimatedCostMicros} μ", color = Lavender, style = MaterialTheme.typography.bodySmall); summary.records.forEach { record -> Text("${record.model}: ${record.inputTokens + record.outputTokens} tokens, ${record.toolCalls} tools", color = Muted, style = MaterialTheme.typography.bodySmall) } } }
+    val usage by viewModel.usage.collectAsState(); val configured by viewModel.configured.collectAsState(); Text("Usage", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold); Text(if (configured) "Review protected provider usage alongside your local work. Provider records are retrieved only after you connect." else "Local Only records no provider tokens or cost. Refresh to confirm your offline posture; connect a provider later if you want remote usage records.", color = Muted, style = MaterialTheme.typography.bodySmall); Button(onClick = { viewModel.refreshUsage() }) { Text("Refresh usage") }
+    usage?.let { summary -> SurfaceCard { Text("${summary.inputTokens + summary.outputTokens} total tokens", fontWeight = FontWeight.Bold); Text("${summary.inputTokens} input · ${summary.outputTokens} output · ${summary.toolCalls} tool calls", color = Muted, style = MaterialTheme.typography.bodySmall); Text("Estimated cost: ${summary.estimatedCostMicros} μ", color = Lavender, style = MaterialTheme.typography.bodySmall); summary.records.forEach { record -> Text("${record.model}: ${record.inputTokens + record.outputTokens} tokens, ${record.toolCalls} tools", color = Muted, style = MaterialTheme.typography.bodySmall) } } } ?: SurfaceCard { Text("No usage snapshot yet", fontWeight = FontWeight.SemiBold); Text("Tap Refresh usage to create a Local Only snapshot or retrieve protected provider totals.", color = Muted, style = MaterialTheme.typography.bodySmall) }
 }
 
 @Composable private fun SettingsScreen(viewModel: AutonovaViewModel) {
@@ -408,9 +480,9 @@ private fun uploadCameraBitmap(bitmap: Bitmap, viewModel: AutonovaViewModel) { v
 
 @Composable private fun ActivityScreen(viewModel: AutonovaViewModel) {
     val activity by viewModel.activity.collectAsState(); Text("Activity", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold); Text("Action summaries only—never hidden reasoning or credentials.", color = Muted, style = MaterialTheme.typography.bodySmall)
-    if (activity.isEmpty()) Text("No synchronized activity yet.", color = Muted) else activity.forEach { item -> SurfaceCard { Text(item.eventType, color = Lavender, style = MaterialTheme.typography.labelSmall); Text(item.title, fontWeight = FontWeight.SemiBold); if (item.detail.isNotBlank()) Text(item.detail, color = Muted, style = MaterialTheme.typography.bodySmall) } }
+    if (activity.isEmpty()) SurfaceCard { Text("No local activity yet", fontWeight = FontWeight.SemiBold); Text("Send a prompt, create a workspace, save memory, or choose a device input. Autonova records a concise local action summary here without exposing private reasoning.", color = Muted, style = MaterialTheme.typography.bodySmall) } else activity.forEach { item -> SurfaceCard { Text(item.eventType, color = Lavender, style = MaterialTheme.typography.labelSmall); Text(item.title, fontWeight = FontWeight.SemiBold); if (item.detail.isNotBlank()) Text(item.detail, color = Muted, style = MaterialTheme.typography.bodySmall) } }
 }
 
-@Composable private fun SurfaceCard(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) { Card(colors = CardDefaults.cardColors(containerColor = Panel), modifier = modifier.fillMaxWidth()) { Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(5.dp), content = content) } }
+@Composable private fun SurfaceCard(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) { Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF171723)), elevation = CardDefaults.cardElevation(defaultElevation = 3.dp), shape = RoundedCornerShape(20.dp), modifier = modifier.fillMaxWidth()) { Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(7.dp), content = content) } }
 
 @Composable internal fun ConfirmDialog(title: String, text: String, action: String, onConfirm: () -> Unit, onDismiss: () -> Unit) { AlertDialog(onDismissRequest = onDismiss, title = { Text(title) }, text = { Text(text) }, confirmButton = { Button(onClick = onConfirm) { Text(action) } }, dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }) }
