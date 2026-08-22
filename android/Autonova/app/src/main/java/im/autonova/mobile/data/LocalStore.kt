@@ -16,6 +16,7 @@ data class LocalKnowledgeUsage(val chunkCount: Long, val documentCount: Long, va
 
 @Dao interface AgentCacheDao {
     @Query("SELECT * FROM cached_tasks ORDER BY updatedAt DESC") fun observeTasks(): Flow<List<CachedTask>>
+    @Query("SELECT * FROM cached_tasks WHERE id = :id LIMIT 1") suspend fun localTask(id: String): CachedTask?
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun upsertTasks(tasks: List<CachedTask>)
     @Query("SELECT * FROM cached_messages ORDER BY createdAt ASC") fun observeMessages(): Flow<List<CachedMessage>>
     @Query("SELECT * FROM cached_messages ORDER BY createdAt DESC LIMIT 40") suspend fun recentMessages(): List<CachedMessage>
@@ -38,8 +39,10 @@ data class LocalKnowledgeUsage(val chunkCount: Long, val documentCount: Long, va
     @Query("SELECT * FROM cached_research") fun observeResearch(): Flow<List<CachedResearch>>
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun upsertResearch(items: List<CachedResearch>)
     @Query("SELECT * FROM cached_learning_candidates") fun observeLearningCandidates(): Flow<List<CachedLearningCandidate>>
+    @Query("SELECT * FROM cached_learning_candidates WHERE id = :id LIMIT 1") suspend fun localLearningCandidate(id: String): CachedLearningCandidate?
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun upsertLearningCandidates(items: List<CachedLearningCandidate>)
     @Query("SELECT * FROM cached_capability_grants") fun observeCapabilityGrants(): Flow<List<CachedCapabilityGrant>>
+    @Query("SELECT * FROM cached_capability_grants WHERE id = :id LIMIT 1") suspend fun localCapabilityGrant(id: String): CachedCapabilityGrant?
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun upsertCapabilityGrants(items: List<CachedCapabilityGrant>)
 }
 

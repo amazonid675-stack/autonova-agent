@@ -15,7 +15,8 @@ class NavigationTest {
 
     @Test fun fresh_launch_explains_the_local_work_path_and_a_ready_command_surface() {
         compose.onNodeWithText("Start working locally").assertIsDisplayed()
-        compose.onNodeWithText("Local projects, memories, tasks, and document storage work now. Private offline answers need a compatible local model.").assertIsDisplayed()
+        compose.onNodeWithText("Plan my day").assertIsDisplayed()
+        compose.onNodeWithText("Create local task").assertIsDisplayed()
         compose.onNodeWithText("Give Autonova a task or question").assertIsDisplayed()
         compose.onNodeWithText("Home").assertIsDisplayed()
     }
