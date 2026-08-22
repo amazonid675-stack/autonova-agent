@@ -120,9 +120,9 @@
 - [x] Make local project, memory, and task creation operate immediately against the Room-backed local workspace in Local Only mode, with explicit success or failure feedback rather than empty synchronized-state messaging.
 - [x] Add Android regression coverage and emulator validation for prompt submission, local project/memory/task creation, disabled-state explanations, and narrow-phone navigation layout.
 - [x] Build, validate, checkpoint, and deliver a corrected Android APK addressing the reported non-functional primary workflows.
-- [ ] Audit every Android tab, button, form, and first-run path against a real observable outcome; replace any UI-only or silent interaction with a functional local action, a consent dialog, or an explicit unavailable-state explanation.
-- [ ] Repair prompt submission so each accepted prompt visibly records the request and returns either a local-model response, a selected local-context result, or a clear model-setup action without silent failure.
-- [ ] Rework local project, memory, task, storage, and command surfaces around a durable offline workspace with on-screen success, failure, and empty-state feedback.
-- [ ] Create a cohesive Autonova Android brand identity, including launcher assets, in-app logo treatment, app name, welcome state, and accessible responsive visual hierarchy.
-- [ ] Create a new private GitHub repository under the user’s current connected account and migrate the verified source history without relying on the deleted account.
-- [ ] Add exhaustive Android interaction regression coverage, emulator validation, a functional APK build, checkpoint, and final delivery for the rebuilt app.
+- [x] Audit every Android tab, button, form, and first-run path against a real observable outcome; replace any UI-only or silent interaction with a functional local action, a consent dialog, or an explicit unavailable-state explanation.
+- [x] Repair prompt submission so each accepted prompt visibly records the request and returns either a local-model response, a selected local-context result, or a clear model-setup action without silent failure.
+- [x] Rework local project, memory, task, storage, and command surfaces around a durable offline workspace with on-screen success, failure, and empty-state feedback.
+- [x] Create a cohesive Autonova Android brand identity, including launcher assets, in-app logo treatment, app name, welcome state, and accessible responsive visual hierarchy.
+- [x] Create a new private GitHub repository under the user’s current connected account and migrate the verified source history without relying on the deleted account.
+- [x] Add exhaustive Android interaction regression coverage, emulator validation, a functional APK build, checkpoint, and final delivery for the rebuilt app.
